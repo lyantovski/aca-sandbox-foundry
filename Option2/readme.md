@@ -6,7 +6,7 @@ Enter a topic (e.g. *"Write a comprehensive blog post about Azure Container Apps
 
 1. **Agent 1 — Tech Research** (LangGraph / Python) — Searches Microsoft Learn, Azure Blog, Tech Community, Azure Updates, and GitHub. Uses AI for intent detection, ranks sources by relevance, fetches full content from top hits, follows depth-1 links from trusted domains, and synthesizes a research brief. Can optionally fetch the top sources inside ACA Sandboxes with per-domain egress policies so the Dev UI can show isolated sandbox status and blocked outbound requests.
 2. **Agent 2 — Content Creator** (Microsoft Agent Framework / .NET) — Transforms the research brief into an original blog post, LinkedIn post, and Twitter thread, all grounded in real sources.
-3. **Agent 3 — Podcaster** (GitHub Copilot SDK / Python) — Creates an engaging podcast script and generates audio. Can use Azure OpenAI TTS or a custom XTTS-v2 server on serverless GPUs.
+3. **Agent 3 — Podcaster** (GitHub Copilot SDK / Python) — Creates an engaging podcast script and generates audio. Can use Azure OpenAI TTS or a custom XTTS-v2 server on serverless GPUs. This agent was co-developed by [@simonjj](https://github.com/simonjj)
 
 **Dev UI** — A lightweight HTML frontend for submitting topics and viewing results from all three agents. When sandbox mode is enabled, it can surface sandbox status tiles before the research brief is ready.
 
