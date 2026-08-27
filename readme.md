@@ -25,3 +25,4 @@ Determine which version you would like to use for detailed information -
 | Item | Option 1 - [Soccer game predictions](Option1/) | Option 2 - [Research of a Microsoft technology](Option2/)|
 | --- | --- | --- |
 | Preview | ![Option 1](Docs/option1.png) | ![Option 2](Docs/option2-dark.png) |
+| MS Build Recording | https://www.youtube.com/watch?v=27FNddH0g7o | |
