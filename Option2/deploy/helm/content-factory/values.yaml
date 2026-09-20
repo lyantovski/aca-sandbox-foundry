@@ -1,0 +1,92 @@
+global:
+  namespace: content-factory
+  imagePullPolicy: IfNotPresent
+  imageRegistry: ""
+  imageTag: latest
+  workloadIdentityClientIds:
+    research: ""
+    creator: ""
+    podcaster: ""
+    bff: ""
+    sandboxBroker: ""
+  nodeSelector:
+    workload.azure.com/type: agent
+  tolerations:
+    - key: workload.azure.com/type
+      operator: Equal
+      value: agent
+      effect: NoSchedule
+
+config:
+  foundryEndpoint: ""
+  agentUrls:
+    research: http://agent-research:8001
+    creator: http://agent-creator:8002
+    podcaster: http://agent-podcaster:8003
+  chatDeploymentName: gpt-4o
+  storageAccountName: ""
+  sandboxSubscriptionId: ""
+  sandboxResourceGroup: ""
+  sandboxGroupName: ""
+  sandboxRegion: swedencentral
+  applicationInsightsConnectionString: ""
+  otlpEndpoint: http://content-factory-otel-collector:4317
+
+secrets:
+  existingSecret: content-factory-secrets
+  a2aTokenKey: a2a-auth-token
+  modelApiKeyKey: model-api-key
+  brokerTokenKey: sandbox-broker-token
+  oauthClientSecretKey: oauth-client-secret
+  oauthCookieSecretKey: oauth-cookie-secret
+
+images:
+  research:
+    repository: agent-research
+  creator:
+    repository: agent-creator
+  podcaster:
+    repository: agent-podcaster
+  devUi:
+    repository: dev-ui
+  bff:
+    repository: bff
+  sandboxBroker:
+    repository: sandbox-broker
+  oauthProxy:
+    repository: quay.io/oauth2-proxy/oauth2-proxy
+    tag: v7.12.0
+
+replicas:
+  agents: 1
+  bff: 2
+  devUi: 2
+  sandboxBroker: 1
+
+entra:
+  enabled: true
+  tenantId: ""
+  clientId: ""
+  oidcIssuerUrl: ""
+
+gateway:
+  enabled: true
+  gatewayClassName: azure-alb-external
+  hostname: ""
+  certificateSecretName: content-factory-tls
+
+resources:
+  agents:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  platform:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

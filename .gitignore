@@ -1,0 +1,41 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.secret.yaml
+secrets/
+.kube/
+kubeconfig*
+*.key
+*.crt
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+
+# JavaScript
+node_modules/
+dist/
+coverage/
+*.log
+
+# Tooling
+.azure/
+.azd/
+.terraform/
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.idea/
+

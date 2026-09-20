@@ -1,101 +1,108 @@
+# Option 2: Agentic Content Factory on AKS
 
-# Option 2: Technical content writer and podcaster
+Option 2 is the active architecture direction for this repository. It runs three existing, polyglot A2A agents on Azure Kubernetes Service, keeps Azure Container Apps Sandboxes as the isolated research execution service, governs AI traffic through Azure API Management, registers agents in Microsoft Foundry, and exposes DevUI through Application Gateway for Containers.
 
+Phase 1 establishes and validates the AKS baseline. Phase 2 may add the [Agent Reference Stack for Kubernetes (KARS)](https://github.com/Azure/kars) after the baseline passes its acceptance gates.
 
-Enter a topic (e.g. *"Write a comprehensive blog post about Azure Container Apps for developers"*). Three agents collaborate:
+> Implementation status: the AKS IaC, Helm packaging, BFF, sandbox-broker integration, and runbooks are under active implementation. The original ACA template remains available in `infra/main.bicep` until the AKS deployment is validated in Azure.
 
-1. **Agent 1 — Tech Research** (LangGraph / Python) — Searches Microsoft Learn, Azure Blog, Tech Community, Azure Updates, and GitHub. Uses AI for intent detection, ranks sources by relevance, fetches full content from top hits, follows depth-1 links from trusted domains, and synthesizes a research brief. Can optionally fetch the top sources inside ACA Sandboxes with per-domain egress policies so the Dev UI can show isolated sandbox status and blocked outbound requests.
-2. **Agent 2 — Content Creator** (Microsoft Agent Framework / .NET) — Transforms the research brief into an original blog post, LinkedIn post, and Twitter thread, all grounded in real sources.
-3. **Agent 3 — Podcaster** (GitHub Copilot SDK / Python) — Creates an engaging podcast script and generates audio. Can use Azure OpenAI TTS or a custom XTTS-v2 server on serverless GPUs. This agent was co-developed by [@simonjj](https://github.com/simonjj)
+## Solution flow
 
-**Dev UI** — A lightweight HTML frontend for submitting topics and viewing results from all three agents. When sandbox mode is enabled, it can surface sandbox status tiles before the research brief is ready.
-
-Agents communicate via the **A2A (Agent-to-Agent) protocol** — each exposes a `/.well-known/agent.json` card for discovery and a `/a2a` JSON-RPC endpoint for task submission. Each agent runs as a separate container on Azure Container Apps.
-
-## Deploy to Azure
-
-```bash
-azd up
+```mermaid
+flowchart LR
+    User[User] -->|Entra ID + HTTPS| AGC[Application Gateway for Containers]
+    AGC --> UI[DevUI]
+    AGC --> BFF[BFF]
+    BFF --> APIM[APIM AI Gateway]
+    APIM --> R[Research Agent]
+    APIM --> C[Creator Agent]
+    APIM --> P[Podcaster Agent]
+    R --> Broker[ACA Sandbox Broker]
+    Broker --> Sandbox[ACA Sandbox Group]
+    R --> APIM
+    C --> APIM
+    P --> APIM
+    APIM --> Foundry[Microsoft Foundry Models]
+    P --> Storage[Azure Storage]
+    R -. OTLP .-> AppInsights[Application Insights]
+    C -. OTLP .-> AppInsights
+    P -. OTLP .-> AppInsights
+    BFF -. OTLP .-> AppInsights
+    Broker -. OTLP .-> AppInsights
 ```
 
-This creates: Azure AI Foundry (GPT-4o + TTS), ACR, ACA Environment, Log Analytics, Storage Account, and Container Apps for each agent plus the Dev UI.
+The existing agent responsibilities and A2A payloads remain unchanged:
 
-## Run Locally
+1. **Research agent** — Python and LangGraph; gathers and ranks sources and optionally performs isolated retrieval through ACA Sandboxes.
+2. **Content creator agent** — .NET and Microsoft Agent Framework; creates the blog and social content.
+3. **Podcaster agent** — Python and GitHub Copilot SDK; creates the script and audio.
 
-With Docker Compose:
+## Documentation
 
-```bash
-cd Lab
-cp .env.example .env  # fill in your Azure OpenAI credentials
-docker compose up     # starts agents 1-3 + dev-ui
+Read these documents in order:
+
+1. [Architecture](docs/01-architecture.md)
+2. [Components](docs/02-components.md)
+3. [Implementation](docs/03-implementation.md)
+4. [Installation and deployment](docs/04-installation.md)
+5. [Validation and operations](docs/05-validation-and-operations.md)
+6. [Phase 2: KARS considerations](docs/06-kars-phase2.md)
+
+Existing agent-level and local-development material remains under [Lab/docs](Lab/docs/).
+
+## Repository layout
+
+```text
+Option2/
+  infra/
+    main.bicep                    # Original ACA deployment
+    aks/                          # Phase 1 AKS infrastructure
+  deploy/helm/content-factory/    # Kubernetes workload packaging
+  Lab/
+    src/
+      agent-research/
+      agent-creator/
+      agent-podcaster/
+      dev-ui/
+      bff/
+      sandbox-broker/
+  docs/                           # Ordered platform documentation
 ```
 
-Without Docker, see the step-by-step guide: [Lab/docs/how-to-run-locally.md](Lab/docs/how-to-run-locally.md).
+## Quick start
 
-### Verify
+### Local application development
 
-```bash
-curl http://localhost:8001/health   # {"status":"healthy","agent":"research-agent"}
-curl http://localhost:8002/health   # {"status":"healthy","agent":"creator-agent"}
-curl http://localhost:8003/health   # {"status":"healthy","agent":"podcaster-agent"}
+```powershell
+Set-Location .\Option2\Lab
+Copy-Item .env.example .env
+docker compose up --build
 ```
 
-## Project Structure
+Open `http://localhost:8080`.
 
-```
-azure.yaml                  # Azure Developer CLI (azd) configuration
-Lab/
-  docker-compose.yml         # Local multi-container setup
-  docs/                      # Architecture docs & run-locally guide
-  sample-output/             # Example blog and podcast transcript
-  src/
-    agent-research/          # Agent 1: Python, LangGraph, FastAPI
-    agent-creator/           # Agent 2: .NET 10, Microsoft Agent Framework
-    agent-podcaster/         # Agent 3: Python, GitHub Copilot SDK, TTS
-    tts-server/              # GPU XTTS-v2 server (full mode only)
-    dev-ui/                  # Static HTML + nginx (port 8080)
-infra/
-  main.bicep                 # Azure deployment (Foundry, ACR, ACA, Storage, GPU)
-  main.parameters.json       # azd parameter wiring
-  pre-rendered/              # Standalone Bicep for lab vendor provisioning
+### Validate deployment assets
+
+```powershell
+az bicep build --file .\Option2\infra\aks\main.bicep
+helm lint .\Option2\deploy\helm\content-factory `
+  -f .\Option2\deploy\helm\content-factory\values.example.yaml
 ```
 
-## Tech Stack
+### Deploy to Azure
 
-| Component | Technology |
-|-----------|-----------|
-| Agent 1 — Research | Python 3.11+, LangGraph, LangChain, FastAPI, httpx, BeautifulSoup |
-| Agent 2 — Creator | .NET 10, Microsoft Agent Framework, ASP.NET Minimal APIs |
-| Agent 3 — Podcaster | Python 3.10+, GitHub Copilot SDK, pydub, httpx |
-| TTS (lab mode) | Azure OpenAI `tts-1` |
-| TTS (full mode) | Coqui XTTS-v2 on GPU, Azure OpenAI fallback |
-| Protocol | A2A (Agent-to-Agent) |
-| Infrastructure | Azure Container Apps, Azure Container Registry, Bicep |
-| Observability | OpenTelemetry, Azure Application Insights |
-| LLM | Azure OpenAI GPT-4o |
+Follow [Installation and deployment](docs/04-installation.md). Do not run the templates without first checking feature availability, quota, APIM tier/networking, DNS, certificates, and preview-feature acceptance.
 
-## Questions?
+## Security boundary
 
-Create an issue in the repo with your question or concern.
+- Agent Services are private `ClusterIP` Services.
+- The browser never receives A2A, model, Storage, or ACA Sandbox credentials.
+- The BFF owns browser-facing API calls.
+- APIM is the governed A2A and model gateway.
+- The sandbox broker alone receives ACA Sandbox permissions.
+- Workload identity is used for Azure resource access where supported.
+- Default-deny NetworkPolicies are the baseline.
 
-## Contributing
+## Phase 2 boundary
 
-This project welcomes contributions and suggestions. Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit [Contributor License Agreements](https://cla.opensource.microsoft.com).
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+KARS is not installed in Phase 1. Phase 1 prepares compatible networking, workload identity, node pools, security controls, and telemetry. KARS adoption requires a separate interoperability and security gate; see [Phase 2: KARS considerations](docs/06-kars-phase2.md).

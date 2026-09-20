@@ -6,8 +6,25 @@ services:
     env_file: .env
     environment:
       - AGENT_BASE_URL=http://agent-research:8001
+      - ACA_SANDBOX_BROKER_URL=http://sandbox-broker:8010
+    depends_on:
+      sandbox-broker:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  sandbox-broker:
+    build:
+      context: .
+      dockerfile: src/sandbox-broker/Dockerfile
+    env_file: .env
+    environment:
+      - OTEL_SERVICE_NAME=aca-sandbox-broker
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8010/health')"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -68,9 +85,26 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      bff:
+        condition: service_healthy
       agent-research:
         condition: service_healthy
       agent-creator:
         condition: service_healthy
       agent-podcaster:
         condition: service_healthy
+
+  bff:
+    build: src/bff
+    env_file: .env
+    environment:
+      - AUTH_REQUIRED=false
+      - RESEARCH_AGENT_URL=http://agent-research:8001
+      - CREATOR_AGENT_URL=http://agent-creator:8002
+      - PODCASTER_AGENT_URL=http://agent-podcaster:8003
+      - OTEL_SERVICE_NAME=content-factory-bff
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

@@ -8,6 +8,7 @@ import os
 import random
 from urllib.parse import urlparse
 
+import httpx
 from opentelemetry import trace
 
 _tracer = trace.get_tracer("research-agent")
@@ -198,6 +199,59 @@ async def execute_in_sandbox(sandbox, script: str) -> dict:
 
 
 async def fetch_with_sandboxes(
+    urls: list[str],
+    topic: str,
+    status_callback=None,
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Fetch through the configured broker, or directly when it is not configured."""
+    broker_url = os.environ.get("ACA_SANDBOX_BROKER_URL", "").strip()
+    if not broker_url:
+        return await fetch_with_sandboxes_direct(urls, topic, status_callback)
+
+    endpoint = f"{broker_url.rstrip('/')}/fetch"
+    timeout = float(os.environ.get("ACA_SANDBOX_BROKER_TIMEOUT_SECONDS", "600"))
+    headers = {}
+    if broker_token := os.environ.get("ACA_SANDBOX_BROKER_TOKEN", ""):
+        headers["X-Internal-Token"] = broker_token
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            request_args = {"json": {"urls": urls, "topic": topic}}
+            if headers:
+                request_args["headers"] = headers
+            response = await client.post(endpoint, **request_args)
+    except httpx.TimeoutException as exc:
+        raise RuntimeError("ACA Sandbox broker request timed out") from exc
+    except httpx.RequestError as exc:
+        raise RuntimeError(f"ACA Sandbox broker is unavailable: {exc}") from exc
+
+    if response.status_code != 200:
+        detail = response.text[:500]
+        try:
+            detail = response.json().get("detail", detail)
+        except (ValueError, AttributeError):
+            pass
+        raise RuntimeError(
+            f"ACA Sandbox broker returned HTTP {response.status_code}: {detail}"
+        )
+
+    try:
+        payload = response.json()
+        result = (
+            payload["fetched_content"],
+            payload["egress_violations"],
+            payload["sandbox_statuses"],
+        )
+        if not all(isinstance(value, list) for value in result):
+            raise TypeError("response fields must be lists")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError("ACA Sandbox broker returned an invalid response") from exc
+
+    if status_callback is not None:
+        await status_callback([dict(status) for status in result[2]])
+    return result
+
+
+async def fetch_with_sandboxes_direct(
     urls: list[str],
     topic: str,
     status_callback=None,

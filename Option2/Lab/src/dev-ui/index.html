@@ -366,29 +366,29 @@
             <div class="cfg-grid" style="margin-top:16px">
                 <div class="cfg-label">URL</div>
                 <div class="cfg-wrap">
-                    <input type="text" id="agent1-url" readonly value="http://localhost:8001" />
+                    <input type="text" id="agent1-url" readonly value="/api/agents/research" />
                     <button class="copy-btn" onclick="copyField('agent1-url')">&#128203;</button>
                 </div>
                 <div class="cfg-wrap">
-                    <input type="text" id="agent2-url" readonly value="http://localhost:8002" />
+                    <input type="text" id="agent2-url" readonly value="/api/agents/creator" />
                     <button class="copy-btn" onclick="copyField('agent2-url')">&#128203;</button>
                 </div>
                 <div class="cfg-wrap">
-                    <input type="text" id="agent3-url" readonly value="http://localhost:8003" />
+                    <input type="text" id="agent3-url" readonly value="/api/agents/podcaster" />
                     <button class="copy-btn" onclick="copyField('agent3-url')">&#128203;</button>
                 </div>
 
                 <div class="cfg-label">A2A Card</div>
                 <div class="cfg-wrap">
-                    <input type="text" id="agent1-card" readonly value="http://localhost:8001/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
+                    <input type="text" id="agent1-card" readonly value="/api/agents/research/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
                     <button class="copy-btn" onclick="event.stopPropagation();copyField('agent1-card')">&#128203;</button>
                 </div>
                 <div class="cfg-wrap">
-                    <input type="text" id="agent2-card" readonly value="http://localhost:8002/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
+                    <input type="text" id="agent2-card" readonly value="/api/agents/creator/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
                     <button class="copy-btn" onclick="event.stopPropagation();copyField('agent2-card')">&#128203;</button>
                 </div>
                 <div class="cfg-wrap">
-                    <input type="text" id="agent3-card" readonly value="http://localhost:8003/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
+                    <input type="text" id="agent3-card" readonly value="/api/agents/podcaster/.well-known/agent.json" style="cursor:pointer" onclick="window.open(this.value,'_blank')" />
                     <button class="copy-btn" onclick="event.stopPropagation();copyField('agent3-card')">&#128203;</button>
                 </div>
 
@@ -405,14 +405,6 @@
                     <input type="text" id="a3-otel" readonly value="" placeholder="—" />
                     <button class="copy-btn" onclick="copyField('a3-otel')">&#128203;</button>
                 </div>
-            </div>
-            <div class="token-row">
-                <div class="cfg-label" id="token-label">&#128273; A2A Token</div>
-                <div class="cfg-wrap" style="flex:1">
-                    <input type="password" id="a2a-token" value="__A2A_TOKEN__" placeholder="Leave empty for local dev (no auth)" />
-                    <button class="copy-btn" onclick="copyField('a2a-token')">&#128203;</button>
-                </div>
-                <button class="copy-btn" id="copyConfigBtn" onclick="copyDevUiConfig()" style="padding:8px 14px;font-size:12px;white-space:nowrap">&#128230; Copy DevUI Config</button>
             </div>
             <div class="token-row" style="margin-top:12px">
                 <div class="cfg-label">&#128737; Research Mode</div>
@@ -507,40 +499,9 @@
         function getAgent2Url() { return document.getElementById('agent2-url').value.trim(); }
         function getAgent3Url() { return document.getElementById('agent3-url').value.trim(); }
 
-        function copyDevUiConfig() {
-            var cfg = {
-                a1: getAgent1Url(),
-                a2: getAgent2Url(),
-                a3: getAgent3Url(),
-                tk: document.getElementById('a2a-token').value.trim()
-            };
-            var encoded = btoa(JSON.stringify(cfg));
-            navigator.clipboard.writeText(encoded).then(function() {
-                var btn = document.getElementById('copyConfigBtn');
-                btn.innerHTML = '\u2705 Copied!';
-                setTimeout(function(){ btn.innerHTML = '\uD83D\uDCE6 Copy DevUI Config'; }, 2000);
-            });
-        }
-
         function getAuthHeaders() {
-            var token = document.getElementById('a2a-token').value.trim();
-            var h = { 'Content-Type': 'application/json' };
-            if (token) h['Authorization'] = 'Bearer ' + token;
-            return h;
+            return { 'Content-Type': 'application/json' };
         }
-
-        // Bootstrap: clear placeholder for local dev, show indicator when token was injected by infra
-        document.addEventListener('DOMContentLoaded', function() {
-            var el = document.getElementById('a2a-token');
-            var val = el.value.trim();
-            if (val === ('__A2A' + '_TOKEN__') || val === '') {
-                el.value = '';
-            } else {
-                var label = document.getElementById('token-label');
-                label.textContent = '\uD83D\uDD11 A2A Token \u2705';
-                label.title = 'Token auto-populated from infrastructure';
-            }
-        });
 
         async function checkHealth() {
             for (var _i = 0, _a = [[getAgent1Url(), 'a1-status', 's1', 'a1-otel'], [getAgent2Url(), 'a2-status', 's2', 'a2-otel'], [getAgent3Url(), 'a3-status', 's3', 'a3-otel']]; _i < _a.length; _i++) {

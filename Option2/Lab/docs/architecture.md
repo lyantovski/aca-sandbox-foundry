@@ -1,4 +1,6 @@
 
+> Legacy runtime diagram: this page describes the original Azure Container Apps hosting model. The active AKS architecture is documented in [`Option2/docs/01-architecture.md`](../../docs/01-architecture.md).
+
 ## Architecture (Top-Down)
 
 Emphasizes the platform layers: presentation → agent pipeline → AI services → observability & governance. Good for explaining the stack to architects.

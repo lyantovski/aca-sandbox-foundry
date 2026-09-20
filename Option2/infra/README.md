@@ -1,5 +1,7 @@
 # Infra
 
+> Legacy ACA deployment: this directory-level template is retained during the AKS migration. The active Phase 1 infrastructure is in [`aks/`](aks/).
+
 Bicep templates and supporting scripts for deploying the lab to Azure.
 
 ## main.bicep

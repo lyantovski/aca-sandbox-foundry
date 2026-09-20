@@ -1,60 +1,10 @@
-# Azure Developer CLI (azd) configuration
-# Deploys the Agentic Content Factory to Azure Container Apps
-# For MVP Summit 2026 LAB015
-
-name: mvp-lab-content-factory
+# Active ACA Sandbox Content Factory deployment: AKS infrastructure.
+# Workload images and Helm release are deployed with docs/04-installation.md.
+name: aca-sandbox-content-factory
 metadata:
-  template: mvp-lab-content-factory@0.0.1
-  description: Multi-agent content factory with Azure Container Apps, Foundry AI, and OTEL telemetry
-
-services:
-  agent-research:
-    project: ./Lab/src/agent-research
-    language: python
-    host: containerapp
-    docker:
-      path: ./Dockerfile
-      context: .
-      remoteBuild: true
-
-  agent-creator:
-    project: ./Lab/src/agent-creator/AgentCreator
-    language: dotnet
-    host: containerapp
-    docker:
-      path: ../Dockerfile
-      context: ..
-      remoteBuild: true
-
-  dev-ui:
-    project: ./Lab/src/dev-ui
-    language: js
-    host: containerapp
-    docker:
-      path: ./Dockerfile
-      context: .
-      remoteBuild: true
-
-  agent-podcaster:
-    project: ./Lab/src/agent-podcaster
-    language: python
-    host: containerapp
-    docker:
-      path: ./Dockerfile
-      context: .
-      remoteBuild: true
-
-  # GPU TTS server -- only deployed when contentFactoryMode=full
-  # Uncomment to enable full mode with GPU XTTS-v2:
-  # tts-server:
-  #   project: ./Lab/src/tts-server
-  #   language: python
-  #   host: containerapp
-  #   docker:
-  #     path: ./Dockerfile
-  #     context: .
-  #     remoteBuild: true
+  template: aca-sandbox-content-factory@0.1.0
+  description: KARS-ready AKS platform for the multi-agent content factory
 
 infra:
-  path: ./infra
+  path: ./infra/aks
   module: main

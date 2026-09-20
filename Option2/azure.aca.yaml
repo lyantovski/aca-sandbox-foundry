@@ -1,0 +1,46 @@
+# Legacy Azure Container Apps deployment retained during the AKS migration.
+name: mvp-lab-content-factory
+metadata:
+  template: mvp-lab-content-factory@0.0.1
+  description: Legacy multi-agent content factory on Azure Container Apps
+
+services:
+  agent-research:
+    project: ./Lab/src/agent-research
+    language: python
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .
+      remoteBuild: true
+
+  agent-creator:
+    project: ./Lab/src/agent-creator/AgentCreator
+    language: dotnet
+    host: containerapp
+    docker:
+      path: ../Dockerfile
+      context: ..
+      remoteBuild: true
+
+  dev-ui:
+    project: ./Lab/src/dev-ui
+    language: js
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .
+      remoteBuild: true
+
+  agent-podcaster:
+    project: ./Lab/src/agent-podcaster
+    language: python
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      context: .
+      remoteBuild: true
+
+infra:
+  path: ./infra
+  module: main

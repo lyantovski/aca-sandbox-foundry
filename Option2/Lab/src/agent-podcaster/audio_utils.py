@@ -95,12 +95,7 @@ async def upload_audio_to_blob(
     task_id: str,
     fmt: str = "mp3",
 ) -> str:
-    """Upload audio bytes to Azure Blob Storage and return a SAS URL.
-
-    Uses AZURE_STORAGE_CONNECTION_STRING from environment. Creates the
-    'podcasts' container if it does not already exist. Returns a time-limited
-    SAS URL (24h) since anonymous blob access is disabled by policy.
-    """
+    """Upload audio bytes to Azure Blob Storage and return a time-limited SAS URL."""
     import asyncio
     from datetime import datetime, timedelta, timezone
     from azure.storage.blob import (
@@ -109,43 +104,70 @@ async def upload_audio_to_blob(
         generate_blob_sas,
         BlobSasPermissions,
     )
+    from azure.identity import DefaultAzureCredential
+    from azure.core.exceptions import ResourceNotFoundError
 
     def _sync_upload() -> str:
-        connection_string = os.environ["AZURE_STORAGE_CONNECTION_STRING"]
-        blob_service = BlobServiceClient.from_connection_string(connection_string)
+        connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+        account_name = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
+        credential = None
 
-        container_name = "podcasts"
-        container_client = blob_service.get_container_client(container_name)
+        if connection_string:
+            blob_service = BlobServiceClient.from_connection_string(connection_string)
+        elif account_name:
+            credential = DefaultAzureCredential()
+            blob_service = BlobServiceClient(
+                account_url=f"https://{account_name}.blob.core.windows.net",
+                credential=credential,
+            )
+        else:
+            raise ValueError(
+                "Set AZURE_STORAGE_ACCOUNT_NAME for managed identity or "
+                "AZURE_STORAGE_CONNECTION_STRING for local development"
+            )
 
-        # Create container if it doesn't exist (private access)
         try:
-            container_client.get_container_properties()
-        except Exception:
-            container_client.create_container()
+            container_name = "podcasts"
+            container_client = blob_service.get_container_client(container_name)
 
-        blob_name = f"{task_id}.{fmt}"
-        mime = "audio/mpeg" if fmt == "mp3" else f"audio/{fmt}"
-        content_settings = ContentSettings(content_type=mime)
+            # Create container if it doesn't exist (private access)
+            try:
+                container_client.get_container_properties()
+            except ResourceNotFoundError:
+                container_client.create_container()
 
-        blob_client = container_client.get_blob_client(blob_name)
-        blob_client.upload_blob(
-            audio_bytes,
-            overwrite=True,
-            content_settings=content_settings,
-        )
+            blob_name = f"{task_id}.{fmt}"
+            mime = "audio/mpeg" if fmt == "mp3" else f"audio/{fmt}"
+            content_settings = ContentSettings(content_type=mime)
 
-        # Generate SAS token for 24h read access
-        account_name = blob_service.account_name
-        account_key = blob_service.credential.account_key
-        sas_token = generate_blob_sas(
-            account_name=account_name,
-            container_name=container_name,
-            blob_name=blob_name,
-            account_key=account_key,
-            permission=BlobSasPermissions(read=True),
-            expiry=datetime.now(timezone.utc) + timedelta(hours=24),
-        )
+            blob_client = container_client.get_blob_client(blob_name)
+            blob_client.upload_blob(
+                audio_bytes,
+                overwrite=True,
+                content_settings=content_settings,
+            )
 
-        return f"{blob_client.url}?{sas_token}"
+            now = datetime.now(timezone.utc)
+            sas_args = {
+                "account_name": blob_service.account_name,
+                "container_name": container_name,
+                "blob_name": blob_name,
+                "permission": BlobSasPermissions(read=True),
+                "expiry": now + timedelta(hours=24),
+            }
+            if connection_string:
+                sas_args["account_key"] = blob_service.credential.account_key
+            else:
+                sas_args["user_delegation_key"] = blob_service.get_user_delegation_key(
+                    now - timedelta(minutes=5),
+                    now + timedelta(hours=24),
+                )
+
+            sas_token = generate_blob_sas(**sas_args)
+            return f"{blob_client.url}?{sas_token}"
+        finally:
+            blob_service.close()
+            if credential is not None:
+                credential.close()
 
     return await asyncio.to_thread(_sync_upload)

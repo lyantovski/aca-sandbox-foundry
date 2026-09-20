@@ -126,3 +126,86 @@ class TestFetchWithSandboxes:
         assert len(groups) == 2
         assert "learn.microsoft.com" in groups
         assert "github.com" in groups
+
+    @pytest.mark.asyncio
+    async def test_uses_broker_when_configured(self):
+        from tools.sandbox_fetch import fetch_with_sandboxes
+
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "fetched_content": [{"url": "https://example.com"}],
+            "egress_violations": [],
+            "sandbox_statuses": [{"status": "success"}],
+        }
+        client = AsyncMock()
+        client.post.return_value = response
+        context = AsyncMock()
+        context.__aenter__.return_value = client
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "ACA_SANDBOX_BROKER_URL": "http://broker:8010",
+                    "ACA_SANDBOX_BROKER_TOKEN": "",
+                },
+            ),
+            patch("tools.sandbox_fetch.httpx.AsyncClient", return_value=context),
+        ):
+            result = await fetch_with_sandboxes(["https://example.com"], "ACA")
+
+        client.post.assert_awaited_once_with(
+            "http://broker:8010/fetch",
+            json={"urls": ["https://example.com"], "topic": "ACA"},
+        )
+        assert result[0] == [{"url": "https://example.com"}]
+
+    @pytest.mark.asyncio
+    async def test_direct_behavior_is_preserved_when_broker_unset(self):
+        from tools.sandbox_fetch import fetch_with_sandboxes
+
+        expected = ([{"url": "direct"}], [], [])
+        with (
+            patch.dict("os.environ", {"ACA_SANDBOX_BROKER_URL": ""}),
+            patch(
+                "tools.sandbox_fetch.fetch_with_sandboxes_direct",
+                new=AsyncMock(return_value=expected),
+            ) as direct,
+        ):
+            result = await fetch_with_sandboxes(["https://example.com"], "ACA")
+
+        direct.assert_awaited_once()
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_sends_internal_token_to_broker(self):
+        from tools.sandbox_fetch import fetch_with_sandboxes
+
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "fetched_content": [],
+            "egress_violations": [],
+            "sandbox_statuses": [],
+        }
+        client = AsyncMock()
+        client.post.return_value = response
+        context = AsyncMock()
+        context.__aenter__.return_value = client
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "ACA_SANDBOX_BROKER_URL": "http://broker:8010",
+                    "ACA_SANDBOX_BROKER_TOKEN": "broker-secret",
+                },
+            ),
+            patch("tools.sandbox_fetch.httpx.AsyncClient", return_value=context),
+        ):
+            await fetch_with_sandboxes(["https://example.com"], "ACA")
+
+        client.post.assert_awaited_once_with(
+            "http://broker:8010/fetch",
+            json={"urls": ["https://example.com"], "topic": "ACA"},
+            headers={"X-Internal-Token": "broker-secret"},
+        )

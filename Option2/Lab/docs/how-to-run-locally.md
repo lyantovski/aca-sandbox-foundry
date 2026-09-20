@@ -1,5 +1,21 @@
 # Run Locally
 
+## Recommended: Docker Compose
+
+Docker Compose now starts the three agents, the ACA Sandbox broker compatibility service, the BFF, and DevUI with the same relative `/api/agents/*` routing used on AKS:
+
+```powershell
+Set-Location Option2\Lab
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+Open `http://localhost:8080`.
+
+Local Compose leaves BFF Entra enforcement disabled and preserves direct ACA Sandbox behavior when broker credentials are not configured. The AKS Helm deployment enables the authenticated BFF boundary.
+
+The manual steps below are intended for agent development and endpoint testing. The static DevUI requires nginx/BFF routing and should not be served with `python -m http.server` after the BFF migration.
+
 ## Prerequisites
 
 - Python 3.11+
@@ -87,14 +103,7 @@ TTS_TIMEOUT_BUDGET_SECONDS=300
 
 ## Start Dev UI
 
-In a fifth terminal (or the fourth, if you skipped the GPU TTS server):
-
-```bash
-cd Lab/src/dev-ui
-python -m http.server 8080 --bind 0.0.0.0
-```
-
-Open http://localhost:8080
+Use Docker Compose for the integrated DevUI, BFF, and agent routing. For manual agent development, call the health and A2A endpoints directly.
 
 ## Verify
 
