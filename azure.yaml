@@ -1,0 +1,10 @@
+# Active ACA Sandbox Content Factory deployment: AKS infrastructure.
+# Workload images and Helm release are deployed with docs/04-deployment.md.
+name: aca-sandbox-content-factory
+metadata:
+  template: aca-sandbox-content-factory@0.1.0
+  description: KARS-ready AKS platform for the multi-agent content factory
+
+infra:
+  path: ./infra
+  module: main

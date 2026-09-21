@@ -1,0 +1,258 @@
+"""Tests for sandbox_fetch module."""
+
+import json
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
+from tools.sandbox_fetch import (
+    _retain_and_cleanup,
+    generate_fetch_script,
+    get_sandbox_retention_seconds,
+    group_urls_by_domain,
+    inject_hallucination,
+)
+
+
+class TestGroupUrlsByDomain:
+    def test_groups_by_domain(self):
+        urls = [
+            "https://learn.microsoft.com/en-us/azure/aks/overview",
+            "https://learn.microsoft.com/en-us/azure/aks/concepts",
+            "https://github.com/Azure-Samples/aks-demo",
+            "https://github.com/Azure/aks-engine",
+            "https://techcommunity.microsoft.com/blog/aks-post",
+        ]
+        groups = group_urls_by_domain(urls)
+        assert "learn.microsoft.com" in groups
+        assert "github.com" in groups
+        assert "techcommunity.microsoft.com" in groups
+        assert len(groups["learn.microsoft.com"]) == 2
+        assert len(groups["github.com"]) == 2
+        assert len(groups["techcommunity.microsoft.com"]) == 1
+
+    def test_empty_urls(self):
+        assert group_urls_by_domain([]) == {}
+
+    def test_single_url(self):
+        groups = group_urls_by_domain(["https://learn.microsoft.com/en-us/azure"])
+        assert len(groups) == 1
+        assert "learn.microsoft.com" in groups
+
+
+class TestGenerateFetchScript:
+    def test_generates_valid_python(self):
+        urls = ["https://example.com/page1", "https://example.com/page2"]
+        script = generate_fetch_script(urls)
+        assert "import requests" in script
+        assert "from bs4 import BeautifulSoup" in script
+        assert "https://example.com/page1" in script
+        assert "https://example.com/page2" in script
+        assert "print(json.dumps(results))" in script
+
+    def test_urls_encoded_as_json(self):
+        urls = ["https://example.com/path?q=test&x=1"]
+        script = generate_fetch_script(urls)
+        # Verify the URL is properly JSON-encoded in the script
+        assert "https://example.com/path?q=test&x=1" in script
+
+    def test_script_has_error_handling(self):
+        script = generate_fetch_script(["https://example.com"])
+        assert "except Exception" in script
+
+
+class TestInjectHallucination:
+    def test_injection_is_always_applied_when_called(self):
+        """Injection is unconditional when function is invoked."""
+        script = generate_fetch_script(["https://example.com"])
+        modified, was_injected = inject_hallucination(script, "test topic")
+        assert was_injected is True
+        assert "bing.com" in modified
+        assert "HALLUCINATION" in modified
+        assert "HALLUCINATION_BLOCKED" in modified
+        assert "status_code == 403" in modified
+
+    def test_injection_preserves_original_logic(self):
+        """Injected script should still contain original fetch logic."""
+        script = generate_fetch_script(["https://example.com"])
+        modified, _ = inject_hallucination(script, "test topic")
+        assert "results = [fetch_url(u) for u in urls]" in modified
+        assert "https://example.com" in modified
+
+
+class TestSandboxRetention:
+    def test_defaults_to_zero(self):
+        with patch.dict("os.environ", {}, clear=True):
+            assert get_sandbox_retention_seconds() == 0
+
+    def test_reads_configured_interval(self):
+        with patch.dict(
+            "os.environ", {"ACA_SANDBOX_RETENTION_SECONDS": "60"}
+        ):
+            assert get_sandbox_retention_seconds() == 60
+
+    @pytest.mark.parametrize("value", ["invalid", "-1", "3601"])
+    def test_rejects_invalid_interval(self, value):
+        with patch.dict(
+            "os.environ", {"ACA_SANDBOX_RETENTION_SECONDS": value}
+        ):
+            with pytest.raises(
+                ValueError, match="ACA_SANDBOX_RETENTION_SECONDS"
+            ):
+                get_sandbox_retention_seconds()
+
+    @pytest.mark.asyncio
+    async def test_retention_cleans_up_after_delay(self):
+        sandbox = AsyncMock()
+        client = AsyncMock()
+        credential = AsyncMock()
+
+        with patch(
+            "tools.sandbox_fetch.asyncio.sleep", new=AsyncMock()
+        ) as sleep:
+            await _retain_and_cleanup(
+                [(sandbox, ["example.com"], "sandbox-1")],
+                client,
+                credential,
+                60,
+            )
+
+        sleep.assert_awaited_once_with(60)
+        sandbox.delete.assert_awaited_once()
+        client.close.assert_awaited_once()
+        credential.close.assert_awaited_once()
+
+
+class TestFetchWithSandboxes:
+    @pytest.fixture
+    def mock_env(self):
+        env = {
+            "AZURE_SUBSCRIPTION_ID": "test-sub-id",
+            "ACA_SANDBOX_RESOURCE_GROUP": "test-rg",
+            "ACA_SANDBOX_GROUP_NAME": "test-group",
+            "ACA_SANDBOXGROUP_REGION": "eastus2",
+        }
+        with patch.dict("os.environ", env):
+            yield
+
+    @pytest.mark.asyncio
+    async def test_raises_without_env_vars(self):
+        from tools.sandbox_fetch import fetch_with_sandboxes
+
+        with patch.dict("os.environ", {
+            "AZURE_SUBSCRIPTION_ID": "",
+            "ACA_SANDBOX_RESOURCE_GROUP": "",
+            "ACA_SANDBOX_GROUP_NAME": "",
+        }):
+            # Mock the SDK imports inside the function
+            mock_sdk = MagicMock()
+            mock_sdk.SandboxGroupClient = MagicMock
+            mock_sdk.endpoint_for_region = lambda r: f"https://{r}.example.com"
+            mock_sdk.EgressPolicy = MagicMock
+            mock_sdk.EgressHostRule = MagicMock
+
+            with patch.dict("sys.modules", {
+                "azure": MagicMock(),
+                "azure.identity": MagicMock(),
+                "azure.identity.aio": MagicMock(DefaultAzureCredential=MagicMock),
+                "azure.containerapps": MagicMock(),
+                "azure.containerapps.sandbox": MagicMock(),
+                "azure.containerapps.sandbox.aio": mock_sdk,
+            }):
+                with pytest.raises(ValueError, match="Missing required env vars"):
+                    await fetch_with_sandboxes(
+                        urls=["https://example.com"],
+                        topic="test",
+                    )
+
+    @pytest.mark.asyncio
+    async def test_group_urls_integration(self, mock_env):
+        """Test that URL grouping works correctly in the context of sandbox fetch."""
+        from tools.sandbox_fetch import group_urls_by_domain
+        groups = group_urls_by_domain(["https://learn.microsoft.com/test", "https://github.com/test"])
+        assert len(groups) == 2
+        assert "learn.microsoft.com" in groups
+        assert "github.com" in groups
+
+    @pytest.mark.asyncio
+    async def test_uses_broker_when_configured(self):
+        from tools.sandbox_fetch import fetch_with_sandboxes
+
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "fetched_content": [{"url": "https://example.com"}],
+            "egress_violations": [],
+            "sandbox_statuses": [{"status": "success"}],
+        }
+        client = AsyncMock()
+        client.post.return_value = response
+        context = AsyncMock()
+        context.__aenter__.return_value = client
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "ACA_SANDBOX_BROKER_URL": "http://broker:8010",
+                    "ACA_SANDBOX_BROKER_TOKEN": "",
+                },
+            ),
+            patch("tools.sandbox_fetch.httpx.AsyncClient", return_value=context),
+        ):
+            result = await fetch_with_sandboxes(["https://example.com"], "ACA")
+
+        client.post.assert_awaited_once_with(
+            "http://broker:8010/fetch",
+            json={"urls": ["https://example.com"], "topic": "ACA"},
+        )
+        assert result[0] == [{"url": "https://example.com"}]
+
+    @pytest.mark.asyncio
+    async def test_direct_behavior_is_preserved_when_broker_unset(self):
+        from tools.sandbox_fetch import fetch_with_sandboxes
+
+        expected = ([{"url": "direct"}], [], [])
+        with (
+            patch.dict("os.environ", {"ACA_SANDBOX_BROKER_URL": ""}),
+            patch(
+                "tools.sandbox_fetch.fetch_with_sandboxes_direct",
+                new=AsyncMock(return_value=expected),
+            ) as direct,
+        ):
+            result = await fetch_with_sandboxes(["https://example.com"], "ACA")
+
+        direct.assert_awaited_once()
+        assert result == expected
+
+    @pytest.mark.asyncio
+    async def test_sends_internal_token_to_broker(self):
+        from tools.sandbox_fetch import fetch_with_sandboxes
+
+        response = MagicMock(status_code=200)
+        response.json.return_value = {
+            "fetched_content": [],
+            "egress_violations": [],
+            "sandbox_statuses": [],
+        }
+        client = AsyncMock()
+        client.post.return_value = response
+        context = AsyncMock()
+        context.__aenter__.return_value = client
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "ACA_SANDBOX_BROKER_URL": "http://broker:8010",
+                    "ACA_SANDBOX_BROKER_TOKEN": "broker-secret",
+                },
+            ),
+            patch("tools.sandbox_fetch.httpx.AsyncClient", return_value=context),
+        ):
+            await fetch_with_sandboxes(["https://example.com"], "ACA")
+
+        client.post.assert_awaited_once_with(
+            "http://broker:8010/fetch",
+            json={"urls": ["https://example.com"], "topic": "ACA"},
+            headers={"X-Internal-Token": "broker-secret"},
+        )

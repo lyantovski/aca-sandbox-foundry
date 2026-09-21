@@ -1,0 +1,40 @@
+flowchart TD
+    Start["User submits topic"]
+    Authenticate["Entra authentication"]
+    Submit["BFF submits research task through APIM"]
+    Discover["Research discovers and ranks sources"]
+    Group["Group URLs by domain with maximum five groups"]
+    Create["Broker creates sandboxes in parallel"]
+    Policy["Apply default deny egress policies"]
+    Fetch["Fetch approved source domains"]
+    Egress["Collect egress decisions"]
+    Retain["Retain completed sandboxes for portal visibility"]
+    Brief["Return research brief"]
+    CreateContent["Creator generates blog and social content"]
+    Podcast["Podcaster generates script and audio"]
+    Persist["Persist audio to private Blob Storage"]
+    Complete["DevUI displays completed workflow"]
+    Cleanup["Delete retained sandboxes asynchronously"]
+    Telemetry["Correlated telemetry in Application Insights"]
+
+    Start --> Authenticate
+    Authenticate --> Submit
+    Submit --> Discover
+    Discover --> Group
+    Group --> Create
+    Create --> Policy
+    Policy --> Fetch
+    Fetch --> Egress
+    Egress --> Retain
+    Retain --> Brief
+    Brief --> CreateContent
+    CreateContent --> Podcast
+    Podcast --> Persist
+    Persist --> Complete
+    Retain -.-> Cleanup
+    Submit -.-> Telemetry
+    Discover -.-> Telemetry
+    Create -.-> Telemetry
+    CreateContent -.-> Telemetry
+    Podcast -.-> Telemetry
+

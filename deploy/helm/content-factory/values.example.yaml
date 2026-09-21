@@ -1,0 +1,64 @@
+global:
+  imageRegistry: acracasandboxcf.azurecr.io
+  imageTag: "2026.09.19"
+  workloadIdentityClientIds:
+    research: 00000000-0000-0000-0000-000000000001
+    creator: 00000000-0000-0000-0000-000000000002
+    podcaster: 00000000-0000-0000-0000-000000000003
+    bff: 00000000-0000-0000-0000-000000000004
+    sandboxBroker: 00000000-0000-0000-0000-000000000005
+
+images:
+  research:
+    tag: ""
+  creator:
+    tag: ""
+  podcaster:
+    tag: ""
+  bff:
+    tag: ""
+  devUi:
+    tag: ""
+  sandboxBroker:
+    tag: ""
+
+config:
+  foundryEndpoint: https://aca-sandbox-foundry.services.ai.azure.com
+  agentUrls:
+    research: https://aca-sandbox-apim.azure-api.net/research-agent
+    creator: https://aca-sandbox-apim.azure-api.net/creator-agent
+    podcaster: https://aca-sandbox-apim.azure-api.net/podcaster-agent
+  storageAccountName: acasandboxstore
+  storagePrivateEndpointCidr: 10.40.17.4/32
+  sandboxSubscriptionId: 00000000-0000-0000-0000-000000000000
+  sandboxResourceGroup: aca-sandbox-content-factory-rg
+  sandboxGroupName: aca-sandbox-sandbox-group
+  sandboxRegion: swedencentral
+  sandboxRetentionSeconds: 60
+  applicationInsightsConnectionString: InstrumentationKey=replace-me
+
+entra:
+  tenantId: 00000000-0000-0000-0000-000000000000
+  clientId: 00000000-0000-0000-0000-000000000000
+  oidcIssuerUrl: https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000/v2.0
+
+gateway:
+  hostname: content-factory.example.com
+  applicationGatewayId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/aca-sandbox-content-factory-rg/providers/Microsoft.ServiceNetworking/trafficControllers/aca-sandbox-agc
+  frontendName: public
+
+# Private, stable A2A origins for the Foundry/APIM AI Gateway.
+# Restrict these internal load balancers to the APIM subnet.
+privateAgentOrigins:
+  enabled: true
+  allowedSourceCidr: 10.40.18.0/24
+  ips:
+    research: 10.40.15.240
+    creator: 10.40.15.241
+    podcaster: 10.40.15.242
+
+replicas:
+  agents: 1
+  bff: 1
+  devUi: 1
+  sandboxBroker: 1

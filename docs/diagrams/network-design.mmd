@@ -1,0 +1,51 @@
+flowchart LR
+    Internet["Internet user"]
+    Entra["Microsoft Entra ID"]
+    SandboxService["ACA Sandbox service"]
+    FoundryService["Microsoft Foundry"]
+
+    subgraph VNet["Lab VNet 10.40.0.0 per 16"]
+        subgraph AGCSubnet["AGC subnet 10.40.16.0 per 24"]
+            AGCNet["AGC frontend and association"]
+        end
+        subgraph AKSSubnet["AKS subnet 10.40.0.0 per 20"]
+            DevNet["DevUI"]
+            BFFNet["OAuth2 Proxy and BFF"]
+            ResearchNet["Research Agent"]
+            CreatorNet["Creator Agent"]
+            PodcastNet["Podcaster Agent"]
+            BrokerNet["Sandbox Broker"]
+            OtelNet["OTEL Collector"]
+            ResearchILB["Research ILB 10.40.15.240"]
+            CreatorILB["Creator ILB 10.40.15.241"]
+            PodcastILB["Podcaster ILB 10.40.15.242"]
+        end
+        subgraph PrivateSubnet["Private endpoints 10.40.17.0 per 24"]
+            BlobPE["Blob private endpoint 10.40.17.4"]
+        end
+        subgraph APIMSubnet["APIM subnet 10.40.18.0 per 24"]
+            APIMNet["APIM outbound VNet integration"]
+        end
+    end
+
+    Internet -->|"HTTPS 443"| AGCNet
+    AGCNet -->|"OIDC redirect"| Entra
+    AGCNet -->|"HTTP 8080"| DevNet
+    AGCNet -->|"HTTP 4180"| BFFNet
+    BFFNet -->|"HTTPS 443"| APIMNet
+    APIMNet -->|"TCP 8001"| ResearchILB
+    APIMNet -->|"TCP 8002"| CreatorILB
+    APIMNet -->|"TCP 8003"| PodcastILB
+    ResearchILB --> ResearchNet
+    CreatorILB --> CreatorNet
+    PodcastILB --> PodcastNet
+    ResearchNet -->|"broker token and HTTP 8010"| BrokerNet
+    BrokerNet -->|"HTTPS 443 with workload identity"| SandboxService
+    PodcastNet -->|"HTTPS 443"| BlobPE
+    APIMNet -->|"HTTPS 443"| FoundryService
+    ResearchNet -.->|"OTLP 4317"| OtelNet
+    CreatorNet -.->|"OTLP 4317"| OtelNet
+    PodcastNet -.->|"OTLP 4317"| OtelNet
+    BrokerNet -.->|"OTLP 4317"| OtelNet
+    BFFNet -.->|"OTLP 4317"| OtelNet
+

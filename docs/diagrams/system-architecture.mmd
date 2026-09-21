@@ -1,0 +1,54 @@
+flowchart TD
+    subgraph ClientLayer["User and Edge"]
+        User["Authenticated user"]
+        AGC["Application Gateway for Containers"]
+    end
+    subgraph WebLayer["AKS Web Layer"]
+        DevUI["DevUI"]
+        OAuth["OAuth2 Proxy"]
+        BFF["Backend for Frontend"]
+    end
+    subgraph GovernanceLayer["AI Governance"]
+        APIM["APIM AI Gateway"]
+        Registry["Foundry Agent Registry"]
+        Models["Foundry Models"]
+    end
+    subgraph AgentLayer["AKS Agent Runtime"]
+        Research["Research Agent"]
+        Creator["Creator Agent"]
+        Podcaster["Podcaster Agent"]
+        Broker["Sandbox Broker"]
+        Collector["OpenTelemetry Collector"]
+    end
+    subgraph DataLayer["External Execution and Data"]
+        Sandboxes["ACA Sandbox Group"]
+        Sources["Approved web sources"]
+        Blob[("Private Blob Storage")]
+        Insights[("Application Insights")]
+    end
+
+    User -->|"HTTPS and Entra ID"| AGC
+    AGC -->|"static content"| DevUI
+    AGC -->|"protected API"| OAuth
+    OAuth -->|"trusted identity headers"| BFF
+    BFF -->|"governed A2A"| APIM
+    Registry -.->|"registered endpoints"| APIM
+    APIM -->|"private origin"| Research
+    APIM -->|"private origin"| Creator
+    APIM -->|"private origin"| Podcaster
+    Research -->|"sandbox task"| Broker
+    Broker -->|"create and execute"| Sandboxes
+    Sandboxes -->|"allowlisted HTTPS"| Sources
+    Research -->|"model API"| APIM
+    Creator -->|"model API"| APIM
+    Podcaster -->|"model API"| APIM
+    APIM -->|"managed model backend"| Models
+    Podcaster -->|"workload identity"| Blob
+    Research -.->|"OTLP"| Collector
+    Creator -.->|"OTLP"| Collector
+    Podcaster -.->|"OTLP"| Collector
+    Broker -.->|"OTLP"| Collector
+    BFF -.->|"OTLP"| Collector
+    Collector -->|"telemetry export"| Insights
+    APIM -.->|"diagnostics"| Insights
+

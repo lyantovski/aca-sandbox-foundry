@@ -1,78 +1,72 @@
-# Agentic Content Factory on AKS
+# Agentic Content Factory Lab
 
-This repository implements a three-agent content factory on Azure Kubernetes Service:
+This repository contains a deployable multi-agent content factory on Azure
+Kubernetes Service (AKS). Three A2A agents research a topic, create written
+content, and produce a podcast. Azure API Management governs agent and model
+traffic, Microsoft Foundry registers the agents, and Azure Container Apps
+Sandboxes isolate web retrieval.
 
-1. A Python/LangGraph research agent discovers and retrieves source material.
-2. A .NET/Microsoft Agent Framework creator agent produces blog and social content.
-3. A Python/GitHub Copilot SDK podcaster agent creates a script and audio.
+## Solution at a glance
 
-Azure Container Apps Sandboxes remain part of the solution as isolated, policy-controlled execution environments. They are invoked through a private broker running on AKS rather than hosting the agents themselves.
+![System architecture](docs/diagrams/system-architecture.svg)
 
-The active implementation is [Option 2](Option2/). Option 1 remains in the repository as a legacy reference and is outside the current implementation scope.
+1. Users authenticate with Microsoft Entra ID through Application Gateway for
+   Containers.
+2. DevUI calls the authenticated backend for frontend (BFF).
+3. The BFF sends A2A requests through APIM AI Gateway.
+4. APIM reaches three private AKS agent origins and the Foundry model endpoint.
+5. The research agent asks the private sandbox broker to create policy-controlled
+   ACA Sandboxes.
+6. The podcaster stores generated audio in private Blob Storage.
+7. Workloads export OTLP telemetry to Application Insights through an in-cluster
+   OpenTelemetry Collector.
 
-## Architecture
+## Repository layout
 
-```mermaid
-flowchart LR
-    User[User] -->|Entra ID + HTTPS| AGC[Application Gateway for Containers]
-    AGC --> UI[DevUI]
-    AGC --> BFF[Backend for Frontend]
-
-    BFF -->|Governed A2A| APIM[API Management AI Gateway]
-    Foundry[Microsoft Foundry Agent Registry] --> APIM
-
-    APIM --> Research[Research Agent on AKS]
-    APIM --> Creator[Creator Agent on AKS]
-    APIM --> Podcaster[Podcaster Agent on AKS]
-    APIM --> Models[Foundry Models]
-
-    Research --> Broker[ACA Sandbox Broker on AKS]
-    Broker --> Sandbox[ACA Sandbox Group]
-    Podcaster --> Storage[Azure Storage]
-
-    Research -. OTLP .-> Insights[Application Insights]
-    Creator -. OTLP .-> Insights
-    Podcaster -. OTLP .-> Insights
-    BFF -. OTLP .-> Insights
-    Broker -. OTLP .-> Insights
+```text
+.
+|-- src/                    # Agents, BFF, DevUI, broker, optional TTS server
+|-- infra/                  # Active AKS and Azure infrastructure Bicep
+|-- deploy/                 # Helm chart and deployment validation scripts
+|-- docs/                   # Ordered architecture and operations guidance
+|-- sample-output/          # Example generated output
+|-- docker-compose.yml      # Local integrated environment
+|-- azure.yaml              # Azure Developer CLI infrastructure entry point
+`-- .azure/                 # Local deployment plan, ignored by Git
 ```
-
-### Platform decisions
-
-- **AKS:** private cluster, Azure CNI powered by Cilium, OIDC, workload identity, dedicated agent node pool, and default-deny network policy.
-- **Application Gateway for Containers:** public TLS/WAF ingress for DevUI and its BFF.
-- **Backend for Frontend:** keeps agent credentials and downstream calls outside browser JavaScript.
-- **APIM AI Gateway:** governs A2A and model calls with identity, policy, throttling, and telemetry.
-- **Microsoft Foundry:** provides model deployments and custom-agent registration.
-- **ACA Sandbox broker:** owns ACA Sandbox permissions and exposes only approved operations to the research agent.
-- **Observability:** applications send OTLP through an OpenTelemetry Collector to Application Insights; Azure Monitor and managed Prometheus collect platform metrics and logs.
-- **KARS:** deliberately deferred to Phase 2; the Phase 1 AKS baseline follows its current networking, identity, node-pool, and policy assumptions.
 
 ## Documentation
 
-Start with the [Option 2 overview](Option2/readme.md), then read:
+Read the documentation in this order:
 
-1. [Architecture](Option2/docs/01-architecture.md)
-2. [Components](Option2/docs/02-components.md)
-3. [Implementation](Option2/docs/03-implementation.md)
-4. [Installation and deployment](Option2/docs/04-installation.md)
-5. [Validation and operations](Option2/docs/05-validation-and-operations.md)
-6. [Phase 2: KARS considerations](Option2/docs/06-kars-phase2.md)
+1. [Solution overview](docs/01-overview.md)
+2. [Architecture and components](docs/02-architecture.md)
+3. [Network design and security flow](docs/03-network-design.md)
+4. [Deployment](docs/04-deployment.md)
+5. [Manual configuration](docs/05-manual-configuration.md)
+6. [Validation and operations](docs/06-validation-and-operations.md)
+7. [Local development](docs/07-local-development.md)
+8. [Current lab environment](docs/08-environment-reference.md)
+9. [KARS Phase 2 considerations](docs/09-kars-phase2.md)
 
-## Implementation status
+Architecture sources and exports are under
+[`docs/diagrams/`](docs/diagrams/README.md).
 
-Phase 1 deployment artifacts are being implemented under:
-
-- `Option2/infra/aks` for Azure infrastructure.
-- `Option2/deploy/helm/content-factory` for AKS workloads.
-- `Option2/Lab/src` for the existing agents and compatibility services.
-
-The original Option 2 ACA template remains available during migration and must not be treated as the active AKS template.
-
-## Validate the deployment assets
+## Quick validation
 
 ```powershell
-.\Option2\deploy\validate.ps1 -SkipTests
+.\deploy\validate.ps1 -SkipTests
 ```
 
-For full installation instructions, including prerequisites, image builds, Helm deployment, APIM configuration, and Foundry registration, see [Installation and deployment](Option2/docs/04-installation.md).
+To run all application tests as well:
+
+```powershell
+.\deploy\validate.ps1
+```
+
+## Deployment boundary
+
+Phase 1 is deployed and validated on AKS. KARS is intentionally excluded from
+Phase 1 and remains a separately gated Phase 2 decision. The demonstration AKS
+API endpoint is public for operator convenience, but workloads are private.
+Production deployments must use a private AKS control plane and trusted TLS.

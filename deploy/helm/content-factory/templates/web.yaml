@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-ui
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app.kubernetes.io/name: dev-ui
+    {{- include "content-factory.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas.devUi }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dev-ui
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dev-ui
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dev-ui
+          image: {{ include "content-factory.image" (list . .Values.images.devUi.repository .Values.images.devUi.tag) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DEV_UI_VERSION
+              value: {{ default .Values.global.imageTag .Values.images.devUi.tag | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            runAsUser: 101
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.resources.platform | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dev-ui
+  namespace: {{ .Values.global.namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: dev-ui
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
