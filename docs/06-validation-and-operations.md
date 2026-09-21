@@ -1,6 +1,20 @@
-# 5. Validation and Operations
+# 6. Validation and Operations
 
 ## Static validation
+
+Run the repository validator without application tests:
+
+```powershell
+.\deploy\validate.ps1 -SkipTests
+```
+
+Run the complete validation, including all application test suites:
+
+```powershell
+.\deploy\validate.ps1
+```
+
+The underlying infrastructure and chart checks can also be run individually:
 
 ```powershell
 az bicep build --file .\infra\main.bicep
@@ -72,6 +86,30 @@ Telemetry destinations:
   not run an application telemetry SDK.
 
 Never enable prompt or response capture by default. Redact tokens, cookies, authorization headers, prompts, generated content, and customer data.
+
+## Visual acceptance evidence
+
+![Completed three-agent DevUI workflow](media/devui-overview.png)
+
+The overview shows all three agents healthy and a completed research, content,
+and podcast run through the authenticated DevUI.
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="media/devui-sandboxes-content.png"
+           alt="ACA Sandbox lifecycle, egress evidence, research brief, and generated content">
+    </td>
+    <td width="50%">
+      <img src="media/devui-podcast.png"
+           alt="Generated social posts, playable podcast, and transcript">
+    </td>
+  </tr>
+  <tr>
+    <td>Sandbox lifecycle and egress evidence are visible beside the synthesized research brief and generated content.</td>
+    <td>The final output includes social posts, browser-playable podcast audio, and the host-and-guest transcript.</td>
+  </tr>
+</table>
 
 ## Live validation record
 

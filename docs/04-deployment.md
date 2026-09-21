@@ -1,8 +1,18 @@
 # 4. Deployment
 
 This procedure deploys Azure infrastructure, builds workload images, and
-installs the AKS Helm release. Portal-only operations are isolated in
-[Manual configuration](05-manual-configuration.md).
+installs the AKS Helm release. Remaining operator-owned actions and verification
+of Bicep-managed Foundry connections are isolated in
+[Manual configuration and verification](05-manual-configuration.md).
+
+## Deployment target
+
+![Deployment target architecture](diagrams/system-architecture.editable-preview.svg)
+
+The deployment creates the Azure and AKS boundaries shown above. Numbered
+connectors distinguish application/A2A, identity, model, sandbox/storage, and
+telemetry traffic; the editable sources are linked from
+[`diagrams/README.md`](diagrams/README.md).
 
 ## Prerequisites
 
@@ -12,6 +22,8 @@ installs the AKS Helm release. Portal-only operations are isolated in
 - Helm 3.14 or later
 - Docker or access to ACR Tasks
 - Contributor and User Access Administrator at the deployment scope
+- Permission to create an Entra application registration, or ownership of an
+  existing application passed to the deployment wrapper
 - An Azure region supporting AKS, APIM Standard v2, AGC, Foundry models, and
   ACA Sandboxes
 
@@ -151,18 +163,21 @@ Set:
 - ACR login server and immutable image tags
 - Workload identity client IDs
 - APIM-governed agent URLs
-- Foundry endpoint
+- APIM model gateway endpoint (the gateway forwards to Foundry)
 - Storage account and private endpoint CIDR
 - Sandbox subscription, resource group, group, region, and retention
-- Entra tenant, client ID, and issuer
 - AGC resource ID, frontend, hostname, and certificate Secret
+
+The workload deployment wrapper injects the Entra tenant, client ID, issuer,
+and final gateway hostname. They do not need to be copied into the private
+values file.
 
 Do not commit `values.dev.yaml` if it contains environment-specific or secret
 material.
 
-## 8. Create runtime secrets
+## 8. Create the base runtime Secret
 
-For the lab:
+Create the non-Entra runtime values before the workload deployment:
 
 ```powershell
 kubectl create namespace content-factory --dry-run=client -o yaml |
@@ -171,43 +186,63 @@ kubectl create namespace content-factory --dry-run=client -o yaml |
 kubectl -n content-factory create secret generic content-factory-secrets `
   --from-literal=a2a-auth-token='<generated-value>' `
   --from-literal=model-api-key='<compatibility-value>' `
-  --from-literal=sandbox-broker-token='<generated-value>' `
-  --from-literal=oauth-client-secret='<entra-client-secret>' `
-  --from-literal=oauth-cookie-secret='<32-byte-random-value>'
+  --from-literal=sandbox-broker-token='<generated-value>'
 ```
+
+Do not add the OAuth client or cookie secrets manually. The automated Entra
+step patches `oauth-client-secret` and `oauth-cookie-secret` into this Secret
+without printing either value.
 
 Use Key Vault CSI for production.
 
-## 9. Validate and deploy workloads
+## 9. Configure Entra and deploy workloads
 
 ```powershell
-helm lint .\deploy\helm\content-factory `
-  -f .\deploy\helm\content-factory\values.dev.yaml
+$deploymentName = '<infrastructure-deployment-name>'
+$devUiHostname = '<devui-hostname>'
 
-helm template content-factory .\deploy\helm\content-factory `
-  -f .\deploy\helm\content-factory\values.dev.yaml > $null
-
-helm upgrade --install content-factory `
-  .\deploy\helm\content-factory `
-  --namespace content-factory `
-  --create-namespace `
-  -f .\deploy\helm\content-factory\values.dev.yaml `
-  --wait `
-  --timeout 15m
+.\deploy\deploy-workloads.ps1 `
+  -ResourceGroup $resourceGroup `
+  -DeploymentName $deploymentName `
+  -ValuesFile .\deploy\helm\content-factory\values.dev.yaml `
+  -GatewayHostname $devUiHostname
 ```
 
-The helper [`deploy/deploy-workloads.ps1`](../deploy/deploy-workloads.ps1) can
-read Bicep deployment outputs and apply the corresponding workload identity and
-resource values.
+`-GatewayHostname` is recommended for an explicit deployment record. When it is
+omitted, the wrapper reuses the current Kubernetes Gateway hostname or reads
+`gateway.hostname` from the values file.
+
+The wrapper:
+
+1. Reads the Bicep deployment outputs.
+2. Runs
+   [`deploy/configure-entra.ps1`](../deploy/configure-entra.ps1), which creates
+   or reuses the Entra application, adds the callback URI, ensures its service
+   principal exists, and patches the OAuth secrets into Kubernetes.
+3. Injects the Entra tenant, client ID, issuer, gateway hostname, workload
+   identities, and Azure resource values into Helm.
+4. Lints and deploys the chart.
+
+On the current lab, the script first adopts the client ID from the deployed
+OAuth2 Proxy or the runtime Secret annotation. For an explicitly selected
+existing registration, add:
+
+```powershell
+-EntraApplicationId '<application-client-id>'
+```
+
+The deployment reuses a valid existing Kubernetes client secret. To rotate the
+one-year Entra credential intentionally, rerun with
+`-RotateEntraClientSecret`.
 
 ## 10. Complete manual configuration
 
-Follow [Manual configuration](05-manual-configuration.md) for:
+Follow [Manual configuration and verification](05-manual-configuration.md) for:
 
-- Entra callback and secrets
+- Verification of the automated Entra configuration
 - Trusted TLS
-- Foundry AI Gateway association
-- Application Insights project connection
+- Verification of the Bicep-managed Foundry APIM connection
+- Verification of the Bicep-managed Application Insights connection
 - Three Foundry custom-agent registrations
 
 Then execute [Validation and operations](06-validation-and-operations.md).

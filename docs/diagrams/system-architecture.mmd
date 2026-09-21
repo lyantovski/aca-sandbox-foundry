@@ -1,16 +1,19 @@
 flowchart TD
-    subgraph ClientLayer["User and Edge"]
-        User["Authenticated user"]
+    subgraph ClientLayer["User Browser and Edge"]
+        User["User"]
+        Browser["Browser running DevUI JavaScript<br/>workflow orchestrator"]
         AGC["Application Gateway for Containers"]
+        Entra["Microsoft Entra ID"]
     end
     subgraph WebLayer["AKS Web Layer"]
-        DevUI["DevUI"]
+        DevUI["DevUI NGINX<br/>static HTML and JavaScript"]
         OAuth["OAuth2 Proxy"]
         BFF["Backend for Frontend"]
     end
     subgraph GovernanceLayer["AI Governance"]
-        APIM["APIM AI Gateway"]
-        Registry["Foundry Agent Registry"]
+        APIMAgents["APIM governed A2A APIs"]
+        APIMModels["APIM model gateway<br/>/openai"]
+        Registry["Foundry custom-agent registry"]
         Models["Foundry Models"]
     end
     subgraph AgentLayer["AKS Agent Runtime"]
@@ -27,22 +30,28 @@ flowchart TD
         Insights[("Application Insights")]
     end
 
-    User -->|"HTTPS and Entra ID"| AGC
-    AGC -->|"static content"| DevUI
-    AGC -->|"protected API"| OAuth
+    User --> Browser
+    Browser -->|"GET / and Entra session"| AGC
+    AGC -->|"GET /"| DevUI
+    DevUI -.->|"HTML and JavaScript"| Browser
+    Browser -->|"same-origin /api calls"| AGC
+    AGC -->|"/api and /oauth2"| OAuth
+    OAuth -.->|"302 OIDC authorization request"| Browser
+    Browser <-->|"sign-in and authorization"| Entra
+    Browser -.->|"callback through AGC"| OAuth
     OAuth -->|"trusted identity headers"| BFF
-    BFF -->|"governed A2A"| APIM
-    Registry -.->|"registered endpoints"| APIM
-    APIM -->|"private origin"| Research
-    APIM -->|"private origin"| Creator
-    APIM -->|"private origin"| Podcaster
+    BFF -->|"research, creator, podcaster A2A"| APIMAgents
+    Registry -.->|"stores and invokes governed URLs"| APIMAgents
+    APIMAgents -->|"private origin"| Research
+    APIMAgents -->|"private origin"| Creator
+    APIMAgents -->|"private origin"| Podcaster
     Research -->|"sandbox task"| Broker
     Broker -->|"create and execute"| Sandboxes
     Sandboxes -->|"allowlisted HTTPS"| Sources
-    Research -->|"model API"| APIM
-    Creator -->|"model API"| APIM
-    Podcaster -->|"model API"| APIM
-    APIM -->|"managed model backend"| Models
+    Research -->|"model inference"| APIMModels
+    Creator -->|"model inference"| APIMModels
+    Podcaster -->|"model and TTS inference"| APIMModels
+    APIMModels -->|"managed identity"| Models
     Podcaster -->|"workload identity"| Blob
     Research -.->|"OTLP"| Collector
     Creator -.->|"OTLP"| Collector
@@ -50,5 +59,5 @@ flowchart TD
     Broker -.->|"OTLP"| Collector
     BFF -.->|"OTLP"| Collector
     Collector -->|"telemetry export"| Insights
-    APIM -.->|"diagnostics"| Insights
-
+    APIMAgents -.->|"diagnostics"| Insights
+    APIMModels -.->|"tokens and diagnostics"| Insights

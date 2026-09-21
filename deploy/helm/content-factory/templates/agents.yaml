@@ -85,8 +85,6 @@ spec:
             {{- if eq $agent.name "podcaster" }}
             - name: AZURE_STORAGE_ACCOUNT_NAME
               value: {{ $root.Values.config.storageAccountName | quote }}
-            - name: CONTENT_FACTORY_MODE
-              value: lab
             {{- end }}
           readinessProbe:
             httpGet:

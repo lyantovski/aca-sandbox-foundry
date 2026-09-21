@@ -5,6 +5,13 @@ instructions use placeholders in [Deployment](04-deployment.md).
 
 Validated on September 21, 2026.
 
+## Current network placement
+
+![Current lab network placement](diagrams/network-design.editable-preview.svg)
+
+The addresses below correspond directly to the subnet, private-origin, APIM,
+private endpoint, and connector labels in the diagram.
+
 ## Azure resources
 
 | Purpose | Current value |

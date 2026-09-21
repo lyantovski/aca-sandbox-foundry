@@ -1,6 +1,15 @@
-# 6. Phase 2: KARS Considerations
+# 9. Phase 2: KARS Considerations
 
 KARS is not part of Phase 1. Phase 1 produces a measurable baseline that Phase 2 can compare against.
+
+## Phase 1 comparison baseline
+
+![Phase 1 architecture baseline](diagrams/system-architecture.editable-preview.svg)
+
+KARS evaluation starts from the working architecture above. Any Phase 2 change
+must identify which AKS runtime, APIM, model, sandbox, storage, identity, or
+telemetry connector it replaces or inserts into and must preserve a tested
+rollback to this baseline.
 
 ## Phase 1 prerequisites retained for KARS
 
@@ -49,4 +58,3 @@ References:
 - https://github.com/Azure/kars
 - https://github.com/Azure/kars/blob/main/docs/getting-started.md
 - https://github.com/Azure/kars/blob/main/docs/maturity.md
-

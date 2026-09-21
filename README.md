@@ -3,6 +3,13 @@
 > A hands-on reference implementation for running governed A2A agents on Azure
 > Kubernetes Service while using Azure Container Apps Sandboxes for isolated,
 > policy-controlled web execution.
+>
+> **Inspiration:** This repository was inspired by
+> [jkalis-MS/azure-container-apps-multi-agent-workflow](https://github.com/jkalis-MS/azure-container-apps-multi-agent-workflow),
+> created by [Jan Kalis](https://github.com/jkalis-MS). This lab evolves that
+> starting point into an AKS-hosted, APIM-governed architecture with A2A agents,
+> Foundry registration, private application boundaries, and ACA Sandbox-based
+> retrieval.
 
 This lab turns a topic into a complete content package: a research agent gathers
 and synthesizes trusted sources, a creator agent produces written and social
@@ -16,6 +23,16 @@ Application Gateway for Containers ingress, APIM AI Gateway governance,
 Microsoft Foundry model access and custom-agent registration, private AKS
 origins, workload identity, private Blob Storage, default-deny networking, and
 end-to-end observability.
+
+## Solution at a glance
+
+![Content Factory high-level architecture](docs/media/architecture2.png)
+
+The user-facing orchestrator coordinates three framework-diverse agents on AKS.
+APIM governs agent and model traffic, Microsoft Foundry supplies models and
+agent registration, Application Insights captures telemetry, and ACA Sandboxes
+isolate the research retrieval tool. The sandboxes do not host the three
+long-running agents.
 
 ## Three agents, three agent frameworks
 
@@ -73,15 +90,6 @@ written content, social posts, and podcast.
   </tr>
 </table>
 
-## Inspiration
-
-This repository was inspired by
-[jkalis-MS/azure-container-apps-multi-agent-workflow](https://github.com/jkalis-MS/azure-container-apps-multi-agent-workflow),
-created by [Jan Kalis](https://github.com/jkalis-MS). This lab evolves that
-starting point into an AKS-hosted, APIM-governed architecture with A2A agents,
-Foundry registration, private application boundaries, and ACA Sandbox-based
-retrieval.
-
 ## What this lab demonstrates
 
 | Area | Implementation |
@@ -95,14 +103,22 @@ retrieval.
 | AI platform | Microsoft Foundry models and custom-agent registration |
 | Isolated execution | ACA Sandbox Group with per-task default-deny egress |
 | Data persistence | Private Blob Storage accessed with Workload Identity |
-| Network protection | Private agent load balancers, APIM source restrictions, and Cilium policy |
+| Network protection | Internal AKS agent endpoints reachable only from the APIM subnet, reinforced by Cilium policy |
 | Observability | OpenTelemetry, Application Insights, Log Analytics, and APIM diagnostics |
 
-## Solution at a glance
+Here, **internal AKS agent endpoints** means that each agent has a Kubernetes
+`LoadBalancer` Service with a private VNet IP, not a public Internet address.
+These stable private IPs are APIM backends. `loadBalancerSourceRanges` permits
+connections only from the APIM subnet (`10.40.18.0/24`), and Cilium enforces
+the same restriction inside AKS. As a result, DevUI and the BFF cannot bypass
+APIM to invoke an agent directly.
+
+## How the deployed system works
 
 ![Agentic Content Factory system architecture](docs/diagrams/system-architecture.editable-preview.svg)
 
-The runtime flow is deliberately layered:
+The detailed topology above is authoritative for network routing and security
+boundaries. The runtime flow is deliberately layered:
 
 1. A user authenticates with Microsoft Entra ID through Application Gateway for
    Containers and OAuth2 Proxy.

@@ -1,5 +1,11 @@
 # 7. Local Development
 
+![Agent frameworks and local runtimes](media/architecture.png)
+
+The local stack preserves the same polyglot boundaries as AKS: LangGraph with
+Python for research, Microsoft Agent Framework with C#/.NET for content
+creation, and GitHub Copilot SDK with Python for podcast generation.
+
 ## Integrated Docker Compose
 
 Copy the environment template and start the stack:
@@ -20,7 +26,6 @@ is disabled locally.
 - Python 3.11 or later
 - .NET 10 SDK
 - Git
-- Optional CUDA GPU for the self-hosted TTS profile
 
 ## Research agent
 
@@ -49,18 +54,8 @@ pip install -e ".[dev]"
 uvicorn main:app --host 0.0.0.0 --port 8003
 ```
 
-`CONTENT_FACTORY_MODE=lab` uses Azure OpenAI TTS. The optional `full` mode uses
-the local XTTS server.
-
-## Optional TTS server
-
-```powershell
-Set-Location .\src\tts-server
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -e ".[dev]"
-uvicorn main:app --host 0.0.0.0 --port 8004 --workers 1
-```
+The podcaster sends text-to-speech requests through the configured APIM model
+gateway to the Foundry TTS deployment.
 
 ## Health checks
 

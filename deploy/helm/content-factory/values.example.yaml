@@ -23,7 +23,8 @@ images:
     tag: ""
 
 config:
-  foundryEndpoint: https://aca-sandbox-foundry.services.ai.azure.com
+  # Azure OpenAI-compatible APIM gateway base URL. The SDK adds /openai.
+  foundryEndpoint: https://aca-sandbox-apim.azure-api.net
   agentUrls:
     research: https://aca-sandbox-apim.azure-api.net/research-agent
     creator: https://aca-sandbox-apim.azure-api.net/creator-agent

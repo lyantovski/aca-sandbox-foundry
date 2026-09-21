@@ -14,6 +14,35 @@ The design has five goals:
 - Isolate research execution with deny-by-default sandbox egress.
 - Provide end-to-end telemetry in Application Insights.
 
+## Agent roles at a glance
+
+![Researcher, creator, podcaster, and DevUI roles](media/architecture.png)
+
+The three agents deliberately use different frameworks. Researcher uses
+LangGraph with Python, Creator uses Microsoft Agent Framework with C#/.NET, and
+Podcaster uses the GitHub Copilot SDK with Python. A2A provides the common
+interoperability contract across those implementations.
+
+## High-level solution
+
+![Content Factory high-level architecture](media/architecture2.png)
+
+The conceptual view shows how DevUI orchestration, the three AKS-hosted agents,
+ACA Sandboxes, APIM, Foundry, and Application Insights fit together. For this
+lab, ACA Sandboxes execute the research retrieval tool against allow-listed
+domains; the agents themselves remain on AKS. The next diagram is authoritative
+for the exact request paths and security boundaries.
+
+## Deployed system boundary
+
+![Agentic Content Factory system architecture](diagrams/system-architecture.editable-preview.svg)
+
+The exact-layout preview above matches the editable
+[Draw.io](diagrams/system-architecture.drawio) and
+[Excalidraw](diagrams/system-architecture.excalidraw) sources. It separates the
+browser, identity, AKS runtime, APIM/Foundry governance, managed execution,
+storage, and telemetry paths.
+
 ## User workflow
 
 ![Execution flow](diagrams/execution-flow.svg)
@@ -63,4 +92,3 @@ Phase 1 does not include KARS. See
 
 Follow [Architecture and components](02-architecture.md), then
 [Network design](03-network-design.md) before deploying the environment.
-

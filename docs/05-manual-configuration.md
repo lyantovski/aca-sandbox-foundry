@@ -1,21 +1,59 @@
-# 5. Manual Configuration
+# 5. Manual Configuration and Verification
 
-This document contains the steps that cannot be completed reliably by the
-current Bicep and Helm deployment. Complete them after
+This document separates steps that still require an operator from verification
+of Foundry connections already created by Bicep. Complete it after
 [Deployment](04-deployment.md).
 
-## 1. Entra application for DevUI
+![Manual configuration touchpoints](diagrams/system-architecture.editable-preview.svg)
 
-Create or reuse an Entra application registration for oauth2-proxy:
+## Automation boundary
 
-1. Add the AGC callback URI:
-   `https://<devui-hostname>/oauth2/callback`.
-2. Create a client secret.
-3. Record the tenant ID and client ID in the private Helm values file.
-4. Store the client secret and a random 32-byte cookie secret in the referenced
-   Kubernetes Secret or production secret store.
+The deployment implementation was checked against
+[`infra/main.bicep`](../infra/main.bicep) and the Helm chart:
 
-Do not commit either secret.
+| Area | Current implementation | Operator action |
+|---|---|---|
+| Entra application registration | Created or adopted by `deploy/configure-entra.ps1` | Verify the selected app; no manual secret creation |
+| Trusted DevUI certificate | Helm references an existing TLS Secret | Supply trusted DNS and certificate material |
+| Foundry APIM project connection | Created by Bicep as `apimProjectConnection` | Verify the connected resource and AI Gateway status |
+| Foundry Application Insights connection | Created by Bicep as `appInsightsProjectConnection` | Verify the connection and Monitoring Reader assignment |
+| Foundry custom A2A assets | Not created by Bicep | Register the three governed agent URLs |
+| Kubernetes runtime Secret | Base Secret is operator-managed; OAuth keys are patched by the Entra script | Supply the non-Entra values or synchronize them from Key Vault |
+
+## 1. Verify the automated Entra application
+
+[`deploy/deploy-workloads.ps1`](../deploy/deploy-workloads.ps1) calls
+[`deploy/configure-entra.ps1`](../deploy/configure-entra.ps1) before Helm. The
+script:
+
+1. Reuses an explicitly supplied application ID, the runtime Secret annotation,
+   the currently deployed OAuth2 Proxy client ID, or one uniquely matching the
+   configured display name, in that order.
+2. Creates a single-tenant application when none can be adopted.
+3. Adds `https://<devui-hostname>/oauth2/callback` without removing existing
+   redirect URIs.
+4. Ensures the corresponding service principal exists.
+5. Creates a one-year client credential only when the Kubernetes Secret has no
+   matching credential, or when rotation is explicitly requested.
+6. Generates the OAuth cookie secret when absent.
+7. Patches both OAuth values into the existing Kubernetes Secret without
+   writing them to the Helm values file or console.
+
+The signed-in deployment identity must be allowed to create application
+registrations. If tenant policy blocks app creation, an owner of an existing
+registration can pass its client ID with `-EntraApplicationId`.
+
+Verify that the application uses the expected callback and that the client ID
+shown in the OAuth2 Proxy deployment matches the Secret annotation:
+
+```powershell
+kubectl -n content-factory get secret content-factory-secrets `
+  -o jsonpath='{.metadata.annotations.content-factory\.azure\.com/entra-client-id}'
+```
+
+Rerun the workload deployment with `-RotateEntraClientSecret` before the
+credential expires. The generated secret remains confidential and is never
+committed.
 
 ## 2. Trusted DevUI TLS
 
@@ -29,35 +67,47 @@ For a trusted endpoint:
 3. Obtain a certificate covering that name.
 4. Create or synchronize the Kubernetes TLS Secret.
 5. Set `gateway.hostname` and `gateway.certificateSecretName`.
-6. Add the final hostname as an Entra redirect URI.
+6. Rerun the workload deployment with the final `-GatewayHostname`; the Entra
+   script adds its callback URI automatically.
 
 Azure Front Door in front of AGC is an alternative trusted public frontend.
 
-## 3. Associate APIM as the Foundry AI Gateway
+## 3. Verify the Bicep-managed APIM project connection
 
-In Foundry:
+The Bicep resource `apimProjectConnection` creates an `ApiManagement`
+connection under the Foundry project, targets the deployed APIM instance, and
+records its gateway URL. Do not add a duplicate connection.
+
+After deployment, verify in Foundry:
 
 1. Open the Foundry resource and project.
-2. Select **Manage > AI Gateway > Add AI Gateway**.
-3. Select **Use existing APIM**.
-4. Choose the APIM instance deployed by Bicep.
-5. Associate the Foundry project.
-6. Confirm the project gateway status is enabled.
+2. Select **Manage > Connected resources** and confirm the APIM connection
+   targets the Bicep-deployed instance.
+3. Open **Manage > AI Gateway** and confirm the project uses that APIM gateway.
+4. Confirm the displayed gateway URL matches
+   `https://<apim-name>.azure-api.net`.
 
-Do not create a second APIM instance.
+If the portal does not recognize the Bicep-managed connection as the active AI
+Gateway, use **Add AI Gateway > Use existing APIM**, select the same APIM
+instance, and then reconcile the resulting connection name with Bicep. Do not
+create a second APIM service.
 
-## 4. Connect Application Insights
+## 4. Verify the Bicep-managed Application Insights connection
+
+The Bicep resource `appInsightsProjectConnection` creates the project connection
+with `ProjectManagedIdentity`. Bicep also assigns Monitoring Reader to the
+Foundry project identity unless an existing assignment name is supplied.
 
 In the Foundry project:
 
 1. Open **Manage > Project details > Connected resources**.
-2. Add the deployed Application Insights component.
-3. Use **Project managed identity**.
+2. Confirm the deployed Application Insights component is present.
+3. Confirm authentication is **Project managed identity**.
 4. Confirm the project identity has Monitoring Reader on Application Insights.
 
-If the portal creates the initial connection, capture its resource name and pass
-it as `appInsightsProjectConnectionName` on later Bicep deployments so the
-template adopts rather than duplicates it.
+If an existing portal-created connection predates the template, pass its
+resource name as `appInsightsProjectConnectionName` so Bicep adopts that
+connection rather than creating another one.
 
 ## 5. Register the three Foundry assets
 
@@ -83,11 +133,10 @@ The Helm chart references an existing Secret. The lab secret requires:
 
 - A2A authentication token
 - Sandbox broker token
-- OAuth client secret
-- OAuth cookie secret
 - Any temporary model compatibility credential still required by the selected
   APIM policy
 
+The Entra automation adds the OAuth client and cookie values to the same Secret.
 Production should synchronize these from Key Vault through the CSI driver.
 
 ## 7. Post-configuration checks
@@ -100,4 +149,3 @@ Production should synchronize these from Key Vault through the CSI driver.
 - Invoke every agent through its APIM-governed URL.
 - Replace the self-signed certificate before treating the endpoint as
   production-ready.
-

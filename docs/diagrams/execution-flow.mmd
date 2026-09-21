@@ -1,7 +1,11 @@
 flowchart TD
+    Load["Browser loads DevUI from AGC"]
+    Api["DevUI JavaScript calls a protected API"]
+    OAuth["OAuth2 Proxy checks the session cookie"]
+    Entra["Microsoft Entra ID sign-in and callback"]
     Start["User submits topic"]
-    Authenticate["Entra authentication"]
-    Submit["BFF submits research task through APIM"]
+    Browser["DevUI JavaScript creates workflow and task IDs"]
+    ResearchCall["Browser calls research through AGC, OAuth2 Proxy, BFF, and APIM"]
     Discover["Research discovers and ranks sources"]
     Group["Group URLs by domain with maximum five groups"]
     Create["Broker creates sandboxes in parallel"]
@@ -9,7 +13,8 @@ flowchart TD
     Fetch["Fetch approved source domains"]
     Egress["Collect egress decisions"]
     Retain["Retain completed sandboxes for portal visibility"]
-    Brief["Return research brief"]
+    Brief["Research brief returns through APIM and BFF to DevUI"]
+    Fanout["DevUI fans out the same brief through BFF and APIM"]
     CreateContent["Creator generates blog and social content"]
     Podcast["Podcaster generates script and audio"]
     Persist["Persist audio to private Blob Storage"]
@@ -17,9 +22,14 @@ flowchart TD
     Cleanup["Delete retained sandboxes asynchronously"]
     Telemetry["Correlated telemetry in Application Insights"]
 
-    Start --> Authenticate
-    Authenticate --> Submit
-    Submit --> Discover
+    Load --> Api
+    Api --> OAuth
+    OAuth -->|"no valid session"| Entra
+    Entra -->|"callback and session cookie"| OAuth
+    OAuth -->|"authenticated API"| Start
+    Start --> Browser
+    Browser --> ResearchCall
+    ResearchCall --> Discover
     Discover --> Group
     Group --> Create
     Create --> Policy
@@ -27,14 +37,15 @@ flowchart TD
     Fetch --> Egress
     Egress --> Retain
     Retain --> Brief
-    Brief --> CreateContent
-    CreateContent --> Podcast
+    Brief --> Fanout
+    Fanout -->|"synchronous A2A"| CreateContent
+    Fanout -->|"asynchronous A2A and polling"| Podcast
     Podcast --> Persist
+    CreateContent --> Complete
     Persist --> Complete
     Retain -.-> Cleanup
-    Submit -.-> Telemetry
+    ResearchCall -.-> Telemetry
     Discover -.-> Telemetry
     Create -.-> Telemetry
     CreateContent -.-> Telemetry
     Podcast -.-> Telemetry
-

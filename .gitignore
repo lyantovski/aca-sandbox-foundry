@@ -32,10 +32,10 @@ coverage/
 # Tooling
 .azure/
 .azd/
+.playwright-mcp/
 .terraform/
 .DS_Store
 Thumbs.db
 *.tmp
 *.swp
 .idea/
-

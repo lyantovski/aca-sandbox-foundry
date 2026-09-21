@@ -9,6 +9,24 @@ $chart = Join-Path $PSScriptRoot 'helm\content-factory'
 $exampleValues = Join-Path $chart 'values.example.yaml'
 $bicep = Join-Path $repoRoot 'infra\main.bicep'
 
+$scriptFiles = Get-ChildItem `
+    -Path (Join-Path $repoRoot 'deploy'), (Join-Path $repoRoot 'infra') `
+    -Filter '*.ps1' `
+    -Recurse
+foreach ($scriptFile in $scriptFiles) {
+    $tokens = $null
+    $parseErrors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile(
+        $scriptFile.FullName,
+        [ref]$tokens,
+        [ref]$parseErrors
+    ) | Out-Null
+    if ($parseErrors.Count -gt 0) {
+        $messages = $parseErrors.Message -join [Environment]::NewLine
+        throw "PowerShell syntax validation failed for '$($scriptFile.FullName)':$([Environment]::NewLine)$messages"
+    }
+}
+
 az bicep build --file $bicep --stdout | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Bicep validation failed.' }
 

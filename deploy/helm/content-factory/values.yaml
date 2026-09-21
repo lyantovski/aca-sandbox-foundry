@@ -18,6 +18,8 @@ global:
       effect: NoSchedule
 
 config:
+  # Backward-compatible key: set this to the APIM gateway base URL, not the
+  # direct Foundry endpoint. Azure OpenAI SDKs append the /openai path.
   foundryEndpoint: ""
   agentUrls:
     research: http://agent-research:8001

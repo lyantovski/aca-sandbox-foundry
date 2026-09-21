@@ -1,7 +1,6 @@
 """Podcaster agent — orchestrates script generation, TTS, and audio delivery."""
 from __future__ import annotations
 
-import asyncio
 import base64
 import logging
 import os
@@ -51,10 +50,8 @@ async def generate_podcast(task_id: str, research_brief: dict) -> dict:
         summary = research_brief.get("summary", "")
         sources = research_brief.get("sources", [])
 
-        # Step 1: Fire TTS warmup (overlaps with LLM call)
+        # Step 1: Create the APIM-governed TTS client
         tts = TTSClient()
-        _tasks[task_id]["progress"] = "Warming_up_TTS"
-        warmup_task = asyncio.create_task(tts.warmup())
 
         # Step 2: Optionally re-fetch top sources for richer content
         _tasks[task_id]["progress"] = "Enriching_sources"
@@ -123,10 +120,7 @@ async def generate_podcast(task_id: str, research_brief: dict) -> dict:
             except Exception as e:
                 logger.warning("Dynamic pronunciation enhancement failed: %s", e)
 
-        # Step 5: Wait for TTS warmup to complete
-        await warmup_task
-
-        # Step 6: Synthesize audio for each turn sequentially
+        # Step 5: Synthesize audio for each turn sequentially
         _tasks[task_id]["progress"] = "Synthesizing_audio"
         with _tracer.start_as_current_span(
             "execute_tool synthesize_audio",
@@ -148,7 +142,7 @@ async def generate_podcast(task_id: str, research_brief: dict) -> dict:
                     duration_ms=0.0,  # Computed during interleaving
                 ))
 
-        # Step 7: Interleave + convert to MP3
+        # Step 6: Interleave + convert to MP3
         _tasks[task_id]["progress"] = "Assembling_audio"
         with _tracer.start_as_current_span(
             "execute_tool assemble_audio",
@@ -163,7 +157,7 @@ async def generate_podcast(task_id: str, research_brief: dict) -> dict:
             wav_bytes, chapters, duration_seconds = interleave_audio(segments)
             mp3_bytes = convert_to_mp3(wav_bytes)
 
-        # Step 8: Upload to Azure Blob Storage
+        # Step 7: Upload to Azure Blob Storage
         _tasks[task_id]["progress"] = "Uploading_audio"
         with _tracer.start_as_current_span(
             "execute_tool upload_audio",
