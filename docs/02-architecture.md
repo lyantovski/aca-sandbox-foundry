@@ -11,7 +11,54 @@ the presentation-grade editable versions:
 The concise Mermaid source remains available as
 [`system-architecture.mmd`](diagrams/system-architecture.mmd).
 
-## Layer-by-layer execution
+## DevUI prompt-to-answer flow
+
+[![DevUI prompt-to-answer execution flow](diagrams/devui-prompt-to-answer-flow.png)](diagrams/devui-prompt-to-answer-flow.png)
+
+Open the image above to inspect the high-resolution flow. Its editable text
+source is
+[`devui-prompt-to-answer-flow.mmd`](diagrams/devui-prompt-to-answer-flow.mmd).
+
+The flow begins when an authenticated user enters a topic in DevUI and ends
+when DevUI displays the research brief, written content, social content, and
+podcast. DevUI browser JavaScript orchestrates the workflow; the agents do not
+call each other directly.
+
+### Execution sequence
+
+| Step | Layer | Request or action | Result |
+|---|---|---|---|
+| 1 | DevUI | The user enters a topic and selects **Run**. | DevUI rejects an empty topic, disables the Run button, clears the previous output, and creates one workflow ID plus research, creator, and podcaster task IDs. |
+| 2 | Browser to edge | DevUI sends `POST /api/agents/research/a2a` with an A2A JSON-RPC `tasks/send` request. | AGC routes `/api` to OAuth2 Proxy and the BFF. |
+| 3 | Identity | OAuth2 Proxy validates the secure session cookie. | An unauthenticated request is redirected to Microsoft Entra ID; an authenticated request carries the user identity to the BFF. |
+| 4 | BFF | The BFF requires the OAuth identity, preserves tracing headers, and adds the server-held A2A bearer token. | The browser never receives the reusable downstream agent credential. |
+| 5 | APIM | The BFF calls the Foundry-governed research API in APIM. | APIM routes the call through the origin API to the research agent private AKS load balancer. |
+| 6 | Research agent | The agent discovers and ranks sources. With sandbox mode enabled, it groups URLs by domain and requests isolated retrieval through the Sandbox Broker. | ACA Sandboxes fetch policy-allowed domains and return content plus egress evidence. |
+| 7 | Live status | DevUI polls `/api/agents/research/status?task_id=...` every 1.5 seconds while research runs. | Real sandbox lifecycle and egress evidence appear before the brief is ready. |
+| 8 | Research result | Research uses APIM `/openai` for inference and returns the brief as an A2A artifact. | The response returns through APIM, BFF, OAuth2 Proxy, and AGC; DevUI renders the brief and final sandbox evidence. |
+| 9 | Browser fan-out | DevUI sends the same brief to Creator and Podcaster in parallel using separate A2A `tasks/send` requests. | Neither downstream agent calls Research or the other agent. |
+| 10 | Creator branch | Creator uses the APIM model gateway and returns the blog and social package synchronously as an A2A artifact. | DevUI validates and displays the content package as soon as this branch completes. |
+| 11 | Podcaster branch | Podcaster creates an internal task and returns HTTP `202` with a task ID. | Podcast generation continues while DevUI remains responsive. |
+| 12 | Podcast processing | Podcaster generates the script, calls speech through APIM, assembles audio, and uploads it through the private Blob endpoint. | Successful completion requires private Blob persistence. |
+| 13 | Podcast polling | DevUI calls `/api/agents/podcaster/tasks/<task-id>` every three seconds for at most 200 attempts. | Progress is shown until `completed`, `failed`, or the approximately ten-minute limit is reached. |
+| 14 | Final answer | DevUI renders the playable audio and transcript and re-enables **Run** after both generation branches have been awaited. | One workflow shows research evidence, the brief, blog, social posts, podcast audio, and transcript. |
+
+### Execution behavior
+
+- The browser, not an agent, controls execution order.
+- Research must complete before Creator and Podcaster start.
+- Creator and Podcaster run concurrently. Creator is synchronous; Podcaster is
+  asynchronous and polled.
+- Browser-to-agent calls follow
+  `DevUI -> AGC -> OAuth2 Proxy -> BFF -> APIM -> private agent origin`.
+- Model and speech calls follow
+  `agent -> APIM /openai -> Microsoft Foundry`.
+- A Research failure stops fan-out. A Creator failure does not stop a podcast
+  already in progress. A Podcaster failure does not remove completed content.
+- Trace context allows the gateway, agents, model, sandbox, and storage work to
+  be correlated in Application Insights.
+
+## Architecture layers
 
 ### 1. Edge and identity
 
@@ -21,6 +68,13 @@ to the oauth2-proxy sidecar. OAuth2 Proxy completes the Microsoft Entra ID flow
 and passes trusted identity headers to the loopback-only BFF.
 
 The browser receives no model, A2A, Storage, or Sandbox credentials.
+
+#### Identity deep dive
+
+See [Identity and access deep dive](11-identity-and-access-deep-dive.md) for
+the Entra user flow, OAuth application, AKS workload federation, managed
+identity and RBAC matrix, platform identities, internal service credentials,
+and least-privilege review.
 
 DevUI is not a server-side orchestrator. NGINX returns the static HTML and
 JavaScript to the browser. That JavaScript creates workflow task IDs, calls the
@@ -54,6 +108,12 @@ APIM Standard v2 provides two distinct runtime surfaces:
 - Token and request throttling.
 - Diagnostics and correlation.
 - Outbound VNet integration to private AKS origins.
+
+#### APIM deep dive
+
+See [APIM AI Gateway deep dive](10-apim-ai-gateway-deep-dive.md) for the API
+inventory, the Foundry-generated-to-origin routing chain, authentication
+boundaries, model policies, token governance, and diagnostics.
 
 Microsoft Foundry also has two distinct roles:
 
@@ -147,9 +207,7 @@ succeed before reporting completion.
 APIM provides a root POST compatibility operation that rewrites to `/a2a`
 because Foundry-generated cards advertise the governed base URL.
 
-## Agent interaction model
-
-![End-to-end execution flow](diagrams/execution-flow.svg)
+## A2A interaction model
 
 The agents do not call each other directly.
 

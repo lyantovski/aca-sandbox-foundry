@@ -10,6 +10,7 @@ documentation, and PNG files are provided for presentations.
 | System architecture | [`system-architecture.mmd`](system-architecture.mmd) | [`system-architecture.excalidraw`](system-architecture.excalidraw) | [`system-architecture.drawio`](system-architecture.drawio) | [`system-architecture.editable-preview.svg`](system-architecture.editable-preview.svg) | [`system-architecture.svg`](system-architecture.svg) | [`system-architecture.png`](system-architecture.png) |
 | Network design | [`network-design.mmd`](network-design.mmd) | [`network-design.excalidraw`](network-design.excalidraw) | [`network-design.drawio`](network-design.drawio) | [`network-design.editable-preview.svg`](network-design.editable-preview.svg) | [`network-design.svg`](network-design.svg) | [`network-design.png`](network-design.png) |
 | Execution flow | [`execution-flow.mmd`](execution-flow.mmd) | - | - | - | [`execution-flow.svg`](execution-flow.svg) | [`execution-flow.png`](execution-flow.png) |
+| DevUI prompt-to-answer flow | [`devui-prompt-to-answer-flow.mmd`](devui-prompt-to-answer-flow.mmd) | - | - | - | [`devui-prompt-to-answer-flow.svg`](devui-prompt-to-answer-flow.svg) | [`devui-prompt-to-answer-flow.png`](devui-prompt-to-answer-flow.png) |
 
 Open `.excalidraw` files with the Microsoft-hosted editor at
 `https://aka.ms/excalidraw`. Open `.drawio` files with diagrams.net, the Draw.io

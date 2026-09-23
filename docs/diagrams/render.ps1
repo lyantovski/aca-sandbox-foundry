@@ -3,7 +3,12 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $diagramRoot = $PSScriptRoot
-$diagrams = @('system-architecture', 'network-design', 'execution-flow')
+$diagrams = @(
+    'system-architecture',
+    'network-design',
+    'execution-flow',
+    'devui-prompt-to-answer-flow'
+)
 
 foreach ($diagram in $diagrams) {
     $source = Join-Path $diagramRoot "$diagram.mmd"
@@ -13,7 +18,17 @@ foreach ($diagram in $diagrams) {
     npx --yes @mermaid-js/mermaid-cli -i $source -o $svg -b transparent
     if ($LASTEXITCODE -ne 0) { throw "Unable to render $source as SVG." }
 
-    npx --yes @mermaid-js/mermaid-cli -i $source -o $png -b transparent -w 2400
+    if ($diagram -eq 'devui-prompt-to-answer-flow') {
+        npx --yes @mermaid-js/mermaid-cli `
+            -i $source `
+            -o $png `
+            -b white `
+            -w 3600 `
+            -s 2
+    }
+    else {
+        npx --yes @mermaid-js/mermaid-cli -i $source -o $png -b transparent -w 2400
+    }
     if ($LASTEXITCODE -ne 0) { throw "Unable to render $source as PNG." }
 }
 

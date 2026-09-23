@@ -179,3 +179,5 @@ governance, and organization-approved network controls.
 7. [Local development](docs/07-local-development.md)
 8. [Current lab environment](docs/08-environment-reference.md)
 9. [KARS Phase 2 considerations](docs/09-kars-phase2.md)
+10. [APIM AI Gateway deep dive](docs/10-apim-ai-gateway-deep-dive.md)
+11. [Identity and access deep dive](docs/11-identity-and-access-deep-dive.md)

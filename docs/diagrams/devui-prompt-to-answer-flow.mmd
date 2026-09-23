@@ -1,0 +1,104 @@
+flowchart TD
+    subgraph UserLayer["User and DevUI"]
+        User["User enters a topic and selects Run"]
+        Validate["DevUI validates the topic"]
+        Ids["DevUI creates workflow and agent task IDs"]
+        ResearchUi["DevUI shows research and sandbox progress"]
+        BriefUi["DevUI displays the research brief"]
+        Fanout["DevUI starts creator and podcaster in parallel"]
+        ContentUi["DevUI displays blog and social content"]
+        PodcastUi["DevUI displays audio and transcript"]
+        Complete["DevUI re-enables Run"]
+        ErrorUi["DevUI displays the failed step"]
+    end
+
+    subgraph EdgeLayer["Authenticated application path"]
+        Agc["Application Gateway for Containers"]
+        OAuth["OAuth2 Proxy validates the session"]
+        Bff["BFF validates identity and adds the A2A token"]
+    end
+
+    subgraph ApimLayer["API Management AI Gateway"]
+        AgentGateway["A2A facades and private agent routing"]
+        ModelGateway["Model and speech gateway"]
+        GatewayTelemetry["Gateway diagnostics and token metrics"]
+    end
+
+    subgraph ResearchLayer["Research stage"]
+        Research["Research agent receives A2A tasks send"]
+        Discover["Discover and rank source URLs"]
+        SandboxBroker["Sandbox Broker creates isolated executions"]
+        Sandboxes["ACA Sandboxes fetch allowed domains"]
+        Synthesize["Research agent synthesizes the brief"]
+        ResearchResult["Return the A2A research artifact"]
+    end
+
+    subgraph ParallelLayer["Parallel generation stage"]
+        Creator["Creator agent receives the research brief"]
+        CreateContent["Generate blog and social content"]
+        CreatorResult["Return the A2A content artifact"]
+        Podcaster["Podcaster accepts the research brief"]
+        Accepted["Return HTTP 202 and podcast task ID"]
+        GeneratePodcast["Generate script and synthesize audio"]
+        StoreAudio["Store audio through the private Blob endpoint"]
+        Poll["DevUI polls podcast task status"]
+        PodcasterStatus["Podcaster task status endpoint"]
+        PodcastResult["Return completed podcast result"]
+    end
+
+    subgraph AiLayer["Shared Azure AI and telemetry"]
+        Foundry["Microsoft Foundry models and speech"]
+        Insights["Application Insights telemetry"]
+    end
+
+    User --> Validate
+    Validate -->|"valid topic"| Ids
+    Validate -->|"empty topic"| ErrorUi
+    Ids -->|"POST research A2A request"| Agc
+    Agc --> OAuth
+    OAuth -->|"authenticated request"| Bff
+    OAuth -->|"missing session"| ErrorUi
+    Bff --> AgentGateway
+    AgentGateway -->|"research A2A request"| Research
+    Research --> Discover
+    Discover -->|"model inference"| ModelGateway
+    Discover -->|"sandbox mode enabled"| SandboxBroker
+    SandboxBroker --> Sandboxes
+    Sandboxes --> Synthesize
+    Discover -->|"sandbox mode disabled"| Synthesize
+    Synthesize -->|"model inference"| ModelGateway
+    Synthesize --> ResearchResult
+    ResearchResult -->|"APIM, BFF, and AGC response"| BriefUi
+    Ids -.->|"poll research status"| ResearchUi
+    Sandboxes -.->|"sandbox status and egress evidence"| ResearchUi
+    BriefUi --> Fanout
+    Fanout -->|"two protected A2A requests"| Agc
+    AgentGateway -->|"creator A2A request"| Creator
+    AgentGateway -->|"podcaster A2A request"| Podcaster
+    Creator --> CreateContent
+    CreateContent -->|"model inference"| ModelGateway
+    CreateContent --> CreatorResult
+    CreatorResult --> ContentUi
+    Podcaster --> Accepted
+    Accepted --> Poll
+    Podcaster --> GeneratePodcast
+    GeneratePodcast -->|"model and speech calls"| ModelGateway
+    GeneratePodcast --> StoreAudio
+    StoreAudio --> PodcastResult
+    Poll -->|"every 3 seconds through protected path"| Agc
+    AgentGateway -->|"podcast status request"| PodcasterStatus
+    PodcasterStatus -->|"accepted or in progress"| Poll
+    PodcasterStatus -->|"completed"| PodcastResult
+    Poll -->|"completed"| PodcastResult
+    Poll -->|"failed or timed out"| ErrorUi
+    PodcastResult --> PodcastUi
+    ContentUi --> Complete
+    PodcastUi --> Complete
+    ModelGateway -->|"managed identity"| Foundry
+    AgentGateway -.-> GatewayTelemetry
+    ModelGateway -.-> GatewayTelemetry
+    GatewayTelemetry -.-> Insights
+    Research -.-> Insights
+    Creator -.-> Insights
+    Podcaster -.-> Insights
+    SandboxBroker -.-> Insights
