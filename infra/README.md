@@ -3,9 +3,10 @@
 This directory contains the active infrastructure entry point for the Agentic
 Content Factory lab.
 
-The template provisions the KARS-ready AKS foundation, ACR, Key Vault, Storage, Application Insights, Log Analytics, Azure Monitor workspace, Foundry resources and models, APIM, Application Gateway for Containers, workload identities, and an ACA Sandbox Group.
-
-It does not install KARS.
+The template provisions the AKS foundation, ACR, Key Vault, Storage,
+Application Insights, Log Analytics, Azure Monitor workspace, Foundry resources
+and models, APIM, Application Gateway for Containers, workload identities, and
+an ACA Sandbox Group.
 
 Validate:
 

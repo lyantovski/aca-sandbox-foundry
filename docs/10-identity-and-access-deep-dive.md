@@ -1,4 +1,4 @@
-# 11. Identity and Access Deep Dive
+# 10. Identity and Access Deep Dive
 
 The solution uses multiple identity systems for different trust boundaries.
 Human authentication, Kubernetes workload identity, Azure managed identities,
@@ -194,7 +194,7 @@ When an agent calls APIM `/openai`:
 5. Foundry authorizes the APIM principal through Azure RBAC.
 
 The agent therefore needs no Foundry credential in its container. See
-[APIM AI Gateway deep dive](10-apim-ai-gateway-deep-dive.md) for the complete
+[APIM AI Gateway deep dive](09-apim-ai-gateway-deep-dive.md) for the complete
 gateway policy and API model.
 
 The live environment also has a broader **Cognitive Services User** assignment

@@ -1,4 +1,4 @@
-# 10. APIM AI Gateway Deep Dive
+# 9. APIM AI Gateway Deep Dive
 
 Azure API Management (APIM) is the controlled gateway between the application
 and two backend categories:

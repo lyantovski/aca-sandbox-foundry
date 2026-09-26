@@ -71,7 +71,7 @@ The browser receives no model, A2A, Storage, or Sandbox credentials.
 
 #### Identity deep dive
 
-See [Identity and access deep dive](11-identity-and-access-deep-dive.md) for
+See [Identity and access deep dive](10-identity-and-access-deep-dive.md) for
 the Entra user flow, OAuth application, AKS workload federation, managed
 identity and RBAC matrix, platform identities, internal service credentials,
 and least-privilege review.
@@ -111,7 +111,7 @@ APIM Standard v2 provides two distinct runtime surfaces:
 
 #### APIM deep dive
 
-See [APIM AI Gateway deep dive](10-apim-ai-gateway-deep-dive.md) for the API
+See [APIM AI Gateway deep dive](09-apim-ai-gateway-deep-dive.md) for the API
 inventory, the Foundry-generated-to-origin routing chain, authentication
 boundaries, model policies, token governance, and diagnostics.
 
@@ -232,8 +232,6 @@ private sandbox broker; that broker relationship is not A2A orchestration.
 - `loadBalancerSourceRanges` restricts those origins to the APIM subnet, while
   `externalTrafficPolicy: Local` preserves the APIM source address so Cilium
   NetworkPolicy can independently enforce the same source restriction.
-- KARS is deferred until the conventional AKS baseline has measurable behavior.
-
 The Helm template applies these fields to every private agent Service when
 `privateAgentOrigins.enabled=true`:
 

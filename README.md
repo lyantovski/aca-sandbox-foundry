@@ -142,13 +142,6 @@ available under [`docs/diagrams/`](docs/diagrams/README.md).
 identity, ingress, and observability paths are deployed and validated as a
 conventional Kubernetes baseline.
 
-**Phase 2 - in progress: adding
-[KARS](https://github.com/Azure/kars).** KARS will be evaluated against the
-Phase 1 baseline for hardened per-agent isolation, governed egress, inference
-routing, A2A ingress, AgentMesh communication, operational complexity, and
-rollback safety. It remains outside the Phase 1 deployment until the documented
-go/no-go gates are satisfied.
-
 The demonstration AKS API endpoint is public for operator convenience, but the
 application workloads and agent origins are private. Production deployments
 must use a private AKS control plane, trusted TLS, production identity
@@ -178,6 +171,5 @@ governance, and organization-approved network controls.
 6. [Validation and operations](docs/06-validation-and-operations.md)
 7. [Local development](docs/07-local-development.md)
 8. [Current lab environment](docs/08-environment-reference.md)
-9. [KARS Phase 2 considerations](docs/09-kars-phase2.md)
-10. [APIM AI Gateway deep dive](docs/10-apim-ai-gateway-deep-dive.md)
-11. [Identity and access deep dive](docs/11-identity-and-access-deep-dive.md)
+9. [APIM AI Gateway deep dive](docs/09-apim-ai-gateway-deep-dive.md)
+10. [Identity and access deep dive](docs/10-identity-and-access-deep-dive.md)

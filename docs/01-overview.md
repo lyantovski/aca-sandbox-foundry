@@ -72,9 +72,6 @@ Phase 1 includes:
 - Private Blob Storage access.
 - OpenTelemetry, Application Insights, Log Analytics, and Azure Monitor.
 
-Phase 1 does not include KARS. See
-[KARS Phase 2 considerations](09-kars-phase2.md).
-
 ## Important demo characteristics
 
 - The AKS API server is public for lab operation; production must use private
